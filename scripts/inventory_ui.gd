@@ -13,6 +13,7 @@ var _char: VBoxContainer
 var _inv: VBoxContainer
 var _side: VBoxContainer
 var _last_signature := ""
+var _focus_key := ""     # which button had controller focus, kept across rebuilds
 
 
 func _ready() -> void:
@@ -111,12 +112,16 @@ func _process(_delta: float) -> void:
 func refresh(force: bool = false) -> void:
 	var p = game.player
 	var sig: String = p.inventory.signature() + str(p.near_workbench()) + p.melee_weapon + p.ranged_weapon \
-		+ str(int(p.health)) + str(int(p.hunger))
+		+ str(int(p.health)) + str(int(p.hunger)) + str(p.using_controller)
 	if chest != null:
 		sig += chest.storage.signature()
 	if not force and sig == _last_signature:
 		return
 	_last_signature = sig
+
+	var focused := get_viewport().gui_get_focus_owner()
+	if focused != null and focused.has_meta("key"):
+		_focus_key = focused.get_meta("key")
 
 	for box in [_char, _inv, _side]:
 		for child in box.get_children():
@@ -128,13 +133,31 @@ func refresh(force: bool = false) -> void:
 		_build_chest()
 	else:
 		_build_crafting(p)
+	if p.using_controller:
+		_restore_focus.call_deferred()
+
+
+## On a controller, keep the highlight on the same button after a rebuild
+## (or put it on the first button when the screen opens).
+func _restore_focus() -> void:
+	var first: Button = null
+	for b in find_children("*", "Button", true, false):
+		if not b.is_visible_in_tree():
+			continue
+		if first == null:
+			first = b
+		if b.get_meta("key", "") == _focus_key:
+			b.grab_focus()
+			return
+	if first != null:
+		first.grab_focus()
 
 
 func _build_character(p) -> void:
 	_char.add_child(_title("Character"))
-	_char.add_child(_small("Equipment  (click a slot to unequip)"))
-	_char.add_child(_slot("Melee  -  right click", p.melee_weapon, "melee"))
-	_char.add_child(_slot("Ranged  -  left click", p.ranged_weapon, "ranged"))
+	_char.add_child(_small("Equipment  (select a slot to unequip)"))
+	_char.add_child(_slot("Melee  -  " + game.hud.prompt("melee"), p.melee_weapon, "melee"))
+	_char.add_child(_slot("Ranged  -  " + game.hud.prompt("shoot"), p.ranged_weapon, "ranged"))
 
 	var m: Dictionary = p.melee_stats()
 	var r: Dictionary = p.ranged_stats()
@@ -157,8 +180,8 @@ func _build_inventory(p) -> void:
 	var inv = p.inventory
 	_inv.add_child(_title("Inventory   %d / %d slots" % [inv.slots_used(), inv.max_slots]))
 	_inv.add_child(_item_grid(inv, _on_player_item, p))
-	var hint := "Click an item to put it in the chest" if chest != null \
-		else "Click a weapon to equip it.\nClick food or medicine to use it.\nClick a chest or workbench to place it."
+	var hint := "Select an item to put it in the chest" if chest != null \
+		else "Select a weapon to equip it.\nSelect food or medicine to use it.\nSelect a chest or workbench to place it."
 	_inv.add_child(_small(hint))
 
 
@@ -166,8 +189,8 @@ func _build_chest() -> void:
 	var st = chest.storage
 	_side.add_child(_title("Chest   %d / %d slots" % [st.slots_used(), st.max_slots]))
 	_side.add_child(_item_grid(st, _on_chest_item, null))
-	_side.add_child(_small("Click an item to take it"))
-	_side.add_child(_small("Tab / I / Esc to close"))
+	_side.add_child(_small("Select an item to take it"))
+	_side.add_child(_small(_close_hint()))
 
 
 func _build_crafting(p) -> void:
@@ -178,13 +201,14 @@ func _build_crafting(p) -> void:
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(370, 400)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true   # scroll along when the D-pad moves down the list
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	for r in Items.RECIPES:
 		list.add_child(_recipe_button(r))
 	_side.add_child(scroll)
-	_side.add_child(_small("Tab / I / Esc to close"))
+	_side.add_child(_small(_close_hint()))
 
 
 func _item_grid(inv, on_click: Callable, p) -> Control:
@@ -205,6 +229,7 @@ func _item_grid(inv, on_click: Callable, p) -> Control:
 		b.custom_minimum_size = Vector2(150, 32)
 		b.add_theme_color_override("font_color", Items.color(id))
 		b.add_theme_color_override("font_hover_color", Items.color(id).lightened(0.3))
+		b.set_meta("key", ("inv:" if p != null else "chest:") + id)
 		b.pressed.connect(on_click.bind(id))
 		grid.add_child(b)
 	return grid
@@ -220,6 +245,7 @@ func _slot(label: String, weapon_id: String, slot: String) -> Control:
 	b.add_theme_font_size_override("font_size", 17)
 	b.add_theme_color_override("font_color", Color(1, 0.92, 0.75))
 	b.disabled = weapon_id == "fists" or weapon_id == ""
+	b.set_meta("key", "slot:" + slot)
 	b.pressed.connect(_on_unequip.bind(slot))
 	box.add_child(b)
 	return box
@@ -252,14 +278,26 @@ func _recipe_button(r: Dictionary) -> Button:
 	b.custom_minimum_size = Vector2(350, 30)
 	b.add_theme_font_size_override("font_size", 14)
 	b.disabled = not game.player.can_craft(r["id"])
+	b.set_meta("key", "craft:" + r["id"])
 	b.pressed.connect(_on_craft.bind(r["id"]))
 	return b
+
+
+func _close_hint() -> String:
+	match game.player.prompt_style():
+		"xbox":
+			return "Menu or B to close"
+		"ps":
+			return "Options or Circle to close"
+	return "Tab / I / Esc to close"
 
 
 func _button(text: String) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE           # so Space / Enter don't click it
+	# Controller: buttons take focus so the D-pad can move between them.
+	# Mouse/keyboard: no focus, so Space / Enter never click a button by accident.
+	b.focus_mode = Control.FOCUS_ALL if game.player.using_controller else Control.FOCUS_NONE
 	b.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	return b
 

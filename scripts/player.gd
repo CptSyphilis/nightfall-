@@ -72,7 +72,9 @@ var hurt_flash := 0.0
 var action_block := 0.0   # short pause on shooting after placing something
 var dead := false
 var controls_enabled := true
-var use_mouse_aim := true
+var use_mouse_aim := true          # false = aim is set from code (tests)
+var using_controller := false      # true after the last input came from a gamepad
+var controller_style := "xbox"     # "xbox" or "ps", decides the button names shown
 var game: Node
 var light: PointLight2D
 
@@ -131,13 +133,14 @@ func _physics_process(delta: float) -> void:
 	_tick_survival(delta)
 	light.energy = game.night_amount * 0.9
 
+	# While the character screen is open you stand still
+	# (the stick and D-pad are moving around the menu instead).
+	var in_menu: bool = game.ui_open
 	var move := Vector2.ZERO
-	if controls_enabled:
+	if controls_enabled and not in_menu:
 		move = Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	if use_mouse_aim:
-		var to_mouse := get_global_mouse_position() - global_position
-		if to_mouse.length() > 1.0:
-			aim_dir = to_mouse.normalized()
+	if use_mouse_aim and not in_menu:
+		_update_aim(move)
 
 	if dodge_timer > 0.0:
 		velocity = dodge_dir * DODGE_SPEED
@@ -146,25 +149,71 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	if controls_enabled:
-		# No fighting while the inventory is open or while placing a structure.
-		var can_fight: bool = not game.ui_open and game.placing == "" and action_block <= 0.0
-		if can_fight and Input.is_action_pressed("shoot"):
-			shoot()
-		if can_fight and Input.is_action_pressed("melee"):
-			melee()
-		if Input.is_action_just_pressed("heal"):
-			heal()
-		if Input.is_action_just_pressed("dodge"):
-			dodge(move)
-		if Input.is_action_just_pressed("ability"):
-			shockwave()
-		if Input.is_action_just_pressed("reload"):
-			start_reload()
 		if Input.is_action_just_pressed("interact"):
-			interact()
-		if Input.is_action_just_pressed("eat"):
-			eat()
+			interact()   # also closes the menu when it is open
+		if not in_menu:
+			# No fighting while placing a structure.
+			var can_fight: bool = game.placing == "" and action_block <= 0.0
+			if can_fight and Input.is_action_pressed("shoot"):
+				shoot()
+			if can_fight and Input.is_action_pressed("melee"):
+				melee()
+			if Input.is_action_just_pressed("heal"):
+				heal()
+			if Input.is_action_just_pressed("dodge"):
+				dodge(move)
+			if Input.is_action_just_pressed("ability"):
+				shockwave()
+			if Input.is_action_just_pressed("reload"):
+				start_reload()
+			if Input.is_action_just_pressed("eat"):
+				eat()
 	queue_redraw()
+
+
+## Mouse: aim at the cursor. Controller: aim with the right stick,
+## or face where you are walking when the right stick is let go.
+func _update_aim(move: Vector2) -> void:
+	if using_controller:
+		var stick := Input.get_vector("aim_left", "aim_right", "aim_up", "aim_down")
+		if stick.length() > 0.0:
+			aim_dir = stick.normalized()
+		elif move.length() > 0.0:
+			aim_dir = move.normalized()
+	else:
+		var to_mouse := get_global_mouse_position() - global_position
+		if to_mouse.length() > 1.0:
+			aim_dir = to_mouse.normalized()
+
+
+## Notice which device was used last, so aiming and button prompts follow it.
+func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.3):
+		if not using_controller or controller_style == "keyboard":
+			controller_style = style_from_name(Input.get_joy_name(event.device))
+		using_controller = true
+	elif event is InputEventKey or event is InputEventMouseButton \
+			or (event is InputEventMouseMotion and event.relative.length() > 2.0):
+		using_controller = false
+
+
+## "ps" for PlayStation pads, "xbox" for everything else (Xbox and generic pads).
+static func style_from_name(joy_name: String) -> String:
+	var n := joy_name.to_lower()
+	# Check Xbox first: "Xbox Wireless Controller" would otherwise match
+	# "wireless controller", which is how PS4 pads name themselves on Linux.
+	for word in ["xbox", "microsoft", "x-box"]:
+		if word in n:
+			return "xbox"
+	for word in ["ps3", "ps4", "ps5", "playstation", "sony", "dualshock", "dualsense", "wireless controller"]:
+		if word in n:
+			return "ps"
+	return "xbox"
+
+
+## Which button names to show on screen: "keyboard", "xbox" or "ps".
+func prompt_style() -> String:
+	return controller_style if using_controller else "keyboard"
 
 
 func _tick_timers(delta: float) -> void:
@@ -455,6 +504,9 @@ func take_damage(amount: float, flash: bool = true) -> void:
 	health -= amount
 	if flash:
 		hurt_flash = 0.2
+		if using_controller:
+			for pad in Input.get_connected_joypads():
+				Input.start_joy_vibration(pad, 0.4, 0.7, 0.18)
 	if health <= 0.0:
 		health = 0.0
 		dead = true
@@ -478,6 +530,11 @@ func _draw() -> void:
 		_draw_swing()
 	else:
 		_draw_ranged_weapon()
+	# On a controller there is no mouse cursor, so show where you are aiming.
+	if using_controller and not dead:
+		var mark := aim_dir * 90.0
+		draw_arc(mark, 7.0, 0.0, TAU, 16, Color(1, 1, 1, 0.55), 2.0)
+		draw_circle(mark, 2.0, Color(1, 1, 1, 0.7))
 	if muzzle_flash > 0.0:
 		draw_circle(aim_dir * (radius + 16.0), 6.0, Color(1, 0.85, 0.4))
 	if shock_flash > 0.0:

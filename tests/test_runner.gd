@@ -50,6 +50,38 @@ func reset_player() -> void:
 	p.collision_mask = 1 | 4
 
 
+# ---- simulated controller input (goes through the real input system)
+func joy_axis(axis: JoyAxis, value: float) -> void:
+	var ev := InputEventJoypadMotion.new()
+	ev.device = 0
+	ev.axis = axis
+	ev.axis_value = value
+	Input.parse_input_event(ev)
+
+
+func joy_button(button: JoyButton) -> void:
+	for down in [true, false]:
+		var ev := InputEventJoypadButton.new()
+		ev.device = 0
+		ev.button_index = button
+		ev.pressed = down
+		Input.parse_input_event(ev)
+
+
+func mapped_button(action: String, button: JoyButton) -> bool:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventJoypadButton and ev.button_index == button:
+			return true
+	return false
+
+
+func mapped_axis(action: String, axis: JoyAxis) -> bool:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventJoypadMotion and ev.axis == axis:
+			return true
+	return false
+
+
 func _run() -> void:
 	print("Running Nightfall Holdout tests")
 	var scene: PackedScene = load("res://scenes/main.tscn")
@@ -402,6 +434,70 @@ func _run() -> void:
 	await frames(1)
 	check(game.ui_open and game.ui._char.get_child_count() > 3, "character screen shows equipment and stats")
 	game.ui.close()
+
+	# --- controller (Xbox / PlayStation)
+	reset_player()
+	check(mapped_axis("shoot", JOY_AXIS_TRIGGER_RIGHT) and mapped_button("melee", JOY_BUTTON_RIGHT_SHOULDER) \
+		and mapped_button("dodge", JOY_BUTTON_A) and mapped_button("interact", JOY_BUTTON_X) \
+		and mapped_button("inventory", JOY_BUTTON_START) and mapped_axis("move_left", JOY_AXIS_LEFT_X) \
+		and mapped_axis("aim_up", JOY_AXIS_RIGHT_Y), "controller buttons and sticks are mapped")
+	check(p.style_from_name("PS4 Controller") == "ps" and p.style_from_name("Sony Interactive Entertainment Wireless Controller") == "ps" \
+		and p.style_from_name("DualSense Wireless Controller") == "ps" and p.style_from_name("Xbox Wireless Controller") == "xbox", \
+		"PlayStation and Xbox pads are told apart")
+	p.controls_enabled = true
+	p.use_mouse_aim = true
+	joy_axis(JOY_AXIS_RIGHT_X, 0.0)
+	joy_axis(JOY_AXIS_RIGHT_Y, -1.0)
+	await frames(3)
+	check(p.using_controller, "touching a stick switches to controller mode")
+	check(p.aim_dir.distance_to(Vector2.UP) < 0.05, "right stick aims")
+	joy_axis(JOY_AXIS_RIGHT_Y, 0.0)
+	var start_pos: Vector2 = p.position
+	joy_axis(JOY_AXIS_LEFT_X, 1.0)
+	await frames(20)
+	joy_axis(JOY_AXIS_LEFT_X, 0.0)
+	await frames(1)
+	check(p.position.x > start_pos.x + 30, "left stick moves the player")
+	check(p.aim_dir.distance_to(Vector2.RIGHT) < 0.05, "with the right stick released you face where you walk")
+	var mag_before: int = p.ammo_in_mag
+	joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	await frames(2)
+	joy_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
+	await frames(1)
+	check(p.ammo_in_mag < mag_before, "RT / R2 fires the ranged weapon")
+	check(game.hud.prompt("interact") in ["X", "Square"], "on-screen prompts switch to controller buttons")
+
+	game.ui.open()
+	await frames(3)
+	check(root.gui_get_focus_owner() is Button, "character screen highlights a button for the D-pad")
+	joy_button(JOY_BUTTON_B)
+	await frames(2)
+	check(not game.ui_open, "B / Circle closes the character screen")
+	joy_button(JOY_BUTTON_START)
+	await frames(2)
+	check(game.ui_open, "Menu / Options opens the character screen")
+	joy_button(JOY_BUTTON_START)
+	await frames(2)
+
+	p.inventory.set_count("chest", 1)
+	p.aim_dir = Vector2.RIGHT
+	game.start_placing("chest")
+	await frames(2)
+	check(game.placement.global_position == game.snap(p.global_position + Vector2(80, 0)), "placement sits in front of you on a controller")
+	var built_before: int = get_nodes_in_group("structures").size()
+	joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
+	await frames(2)
+	joy_axis(JOY_AXIS_TRIGGER_RIGHT, 0.0)
+	await frames(1)
+	check(get_nodes_in_group("structures").size() == built_before + 1 and game.placing == "", "RT / R2 places the chest")
+
+	var mm := InputEventMouseMotion.new()
+	mm.relative = Vector2(10, 0)
+	Input.parse_input_event(mm)
+	await frames(1)
+	check(not p.using_controller and game.hud.prompt("interact") == "E", "moving the mouse switches back to mouse and keyboard")
+	p.controls_enabled = false
+	p.use_mouse_aim = false
 
 	# --- death
 	reset_player()

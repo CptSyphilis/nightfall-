@@ -62,7 +62,7 @@ func _ready() -> void:
 	_spawn_resources()
 	for i in 12:
 		spawn_zombie(_random_spawn_point(500, 1300), false)
-	hud.show_message("Day 1 - gather wood and stone, press Tab to craft", 5.0)
+	hud.show_message("Day 1 - gather wood and stone, then open the character screen to craft", 5.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -425,44 +425,67 @@ func _draw() -> void:
 
 
 # ---------------------------------------------------------------- controls
+# Every action works on keyboard + mouse AND on a controller.
+# Xbox and PlayStation pads use the same button numbers in Godot:
+#   A = Cross, B = Circle, X = Square, Y = Triangle, LB/RB = L1/R1, LT/RT = L2/R2.
 
 static func setup_input() -> void:
-	_add_key("move_up", KEY_W)
-	_add_key("move_down", KEY_S)
-	_add_key("move_left", KEY_A)
-	_add_key("move_right", KEY_D)
-	_add_key("dodge", KEY_SPACE)
-	_add_key("ability", KEY_Q)
-	_add_key("reload", KEY_R)
-	_add_key("interact", KEY_E)
-	_add_key("eat", KEY_F)
-	_add_key("restart", KEY_ENTER)
-	_add_key("heal", KEY_H)
-	if not InputMap.has_action("inventory"):
-		_add_key("inventory", KEY_TAB)
-		InputMap.action_add_event("inventory", _key_event(KEY_I))
-	_add_key("close_ui", KEY_ESCAPE)
-	_add_mouse("shoot", MOUSE_BUTTON_LEFT)
-	_add_mouse("melee", MOUSE_BUTTON_RIGHT)
+	if InputMap.has_action("move_up"):
+		return   # already set up (the scene was restarted)
+	_action("move_up",    0.25, [_key(KEY_W), _axis(JOY_AXIS_LEFT_Y, -1.0)])
+	_action("move_down",  0.25, [_key(KEY_S), _axis(JOY_AXIS_LEFT_Y, 1.0)])
+	_action("move_left",  0.25, [_key(KEY_A), _axis(JOY_AXIS_LEFT_X, -1.0)])
+	_action("move_right", 0.25, [_key(KEY_D), _axis(JOY_AXIS_LEFT_X, 1.0)])
+	_action("aim_up",     0.25, [_axis(JOY_AXIS_RIGHT_Y, -1.0)])
+	_action("aim_down",   0.25, [_axis(JOY_AXIS_RIGHT_Y, 1.0)])
+	_action("aim_left",   0.25, [_axis(JOY_AXIS_RIGHT_X, -1.0)])
+	_action("aim_right",  0.25, [_axis(JOY_AXIS_RIGHT_X, 1.0)])
+	_action("shoot",     0.5, [_mouse(MOUSE_BUTTON_LEFT), _axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)])
+	_action("melee",     0.5, [_mouse(MOUSE_BUTTON_RIGHT), _button(JOY_BUTTON_RIGHT_SHOULDER)])
+	_action("dodge",     0.5, [_key(KEY_SPACE), _button(JOY_BUTTON_A)])
+	_action("ability",   0.5, [_key(KEY_Q), _button(JOY_BUTTON_LEFT_SHOULDER)])
+	_action("reload",    0.5, [_key(KEY_R), _button(JOY_BUTTON_Y)])
+	_action("interact",  0.5, [_key(KEY_E), _button(JOY_BUTTON_X)])
+	_action("eat",       0.5, [_key(KEY_F), _button(JOY_BUTTON_DPAD_UP)])
+	_action("heal",      0.5, [_key(KEY_H), _button(JOY_BUTTON_DPAD_DOWN)])
+	_action("inventory", 0.5, [_key(KEY_TAB), _key(KEY_I), _button(JOY_BUTTON_START)])
+	_action("close_ui",  0.5, [_key(KEY_ESCAPE), _button(JOY_BUTTON_B)])
+	_action("restart",   0.5, [_key(KEY_ENTER), _button(JOY_BUTTON_A)])
+	# Let the left stick move around menus too (the D-pad already does).
+	InputMap.action_add_event("ui_up", _axis(JOY_AXIS_LEFT_Y, -1.0))
+	InputMap.action_add_event("ui_down", _axis(JOY_AXIS_LEFT_Y, 1.0))
+	InputMap.action_add_event("ui_left", _axis(JOY_AXIS_LEFT_X, -1.0))
+	InputMap.action_add_event("ui_right", _axis(JOY_AXIS_LEFT_X, 1.0))
 
 
-static func _add_key(action: String, key: Key) -> void:
-	if InputMap.has_action(action):
-		return
-	InputMap.add_action(action)
-	InputMap.action_add_event(action, _key_event(key))
+static func _action(action: String, deadzone: float, events: Array) -> void:
+	InputMap.add_action(action, deadzone)
+	for ev in events:
+		InputMap.action_add_event(action, ev)
 
 
-static func _key_event(key: Key) -> InputEventKey:
+static func _key(key: Key) -> InputEventKey:
 	var ev := InputEventKey.new()
 	ev.physical_keycode = key
 	return ev
 
 
-static func _add_mouse(action: String, button: MouseButton) -> void:
-	if InputMap.has_action(action):
-		return
-	InputMap.add_action(action)
+static func _mouse(button: MouseButton) -> InputEventMouseButton:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = button
-	InputMap.action_add_event(action, ev)
+	return ev
+
+
+static func _button(button: JoyButton) -> InputEventJoypadButton:
+	var ev := InputEventJoypadButton.new()
+	ev.device = -1          # any controller
+	ev.button_index = button
+	return ev
+
+
+static func _axis(axis: JoyAxis, direction: float) -> InputEventJoypadMotion:
+	var ev := InputEventJoypadMotion.new()
+	ev.device = -1
+	ev.axis = axis
+	ev.axis_value = direction
+	return ev

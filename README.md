@@ -5,7 +5,7 @@ A top-down zombie survival game made in Godot 4.
 Survival like Project Zomboid (hunger, scavenging, noise attracts zombies),
 combat like V Rising (mouse aim, melee arcs, dodge roll, cooldown ability).
 
-Version 0.1 - single player, survive day and night.
+Single player. Gather, craft, build, and survive the night hordes.
 
 
 Play in the browser
@@ -24,21 +24,36 @@ How to run
 
 Controls
 --------
-WASD          move
-Mouse         aim
-Left click    shoot (loud - zombies come to the noise)
-Right click   melee swing (quiet, no ammo)
-Space         dodge roll (you cannot be hit while rolling)
-Q             shockwave (knocks back everything near you, 8s cooldown)
-R             reload
-E             search a crate
-F             eat food
-Enter         restart after dying
+Keyboard + mouse        Xbox            PlayStation     Action
+WASD                    Left stick      Left stick      move
+Mouse                   Right stick     Right stick     aim
+Left click              RT              R2              ranged weapon
+Right click             RB              R1              melee weapon / gather
+Space                   A               Cross           dodge roll (no damage while rolling)
+Q                       LB              L1              shockwave (8s cooldown)
+R                       Y               Triangle        reload
+E                       X               Square          search crate / open chest / workbench
+F                       D-pad up        D-pad up        eat
+H                       D-pad down      D-pad down      heal (bandage, then medkit)
+Tab or I                Menu            Options         character screen
+Esc                     B               Circle          close menu / cancel placing
+Enter                   A               Cross           restart after dying
+
+The game switches button prompts automatically to whatever you last touched.
+
+
+Weapons
+-------
+Melee:  Fists, Club, Stone axe (double wood), Spear (long reach, narrow),
+        Spiked club, Machete (double scrap)
+Ranged: Pistol (loud, attracts zombies), Bow and Crossbow (quiet, use arrows)
+Craft them in the character screen, then select one to equip it.
 
 
 How it plays
 ------------
-Day (90s):   scavenge crates for ammo, food and medkits. Zombies wander slowly.
+Day (90s):   gather wood, stone and scrap, search crates, craft and build.
+             Zombies wander slowly.
 Night (60s): it gets dark, zombies see further, and a horde spawns and hunts you.
 Each new day the zombies get tougher and the horde gets bigger.
 Hunger drains over time. At 0 you lose health. Keep it above 60 to slowly heal.

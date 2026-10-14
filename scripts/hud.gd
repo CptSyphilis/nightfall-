@@ -4,6 +4,18 @@ extends Control
 
 const Items := preload("res://scripts/items.gd")
 
+const PROMPTS := {
+	"keyboard": {"melee": "right click", "interact": "E", "restart": "Enter", "shoot": "left click", "cancel": "right click", "inventory": "Tab"},
+	"xbox":     {"melee": "RB", "interact": "X", "restart": "A", "shoot": "RT", "cancel": "B", "inventory": "Menu"},
+	"ps":       {"melee": "R1", "interact": "Square", "restart": "Cross", "shoot": "R2", "cancel": "Circle", "inventory": "Options"},
+}
+
+const CONTROL_HINTS := {
+	"keyboard": "WASD move   LMB ranged   RMB melee / gather   Space dodge   Q shockwave   R reload   E use   F eat   H heal   Tab character",
+	"xbox": "LS move   RS aim   RT ranged   RB melee / gather   A dodge   LB shockwave   Y reload   X use   D-pad up eat / down heal   Menu character",
+	"ps": "L-stick move   R-stick aim   R2 ranged   R1 melee / gather   Cross dodge   L1 shockwave   Triangle reload   Square use   D-pad up eat / down heal   Options character",
+}
+
 var game: Node
 var font: Font
 var _message := ""
@@ -52,29 +64,36 @@ func _draw() -> void:
 
 	# Prompt when standing next to something you can use.
 	if not p.dead and not game.ui_open:
-		var prompt := ""
+		var what := ""
 		if game.nearest_crate(p.global_position, 48.0) != null:
-			prompt = "E  search"
+			what = "search"
 		else:
 			var s = game.nearest_structure(p.global_position, 64.0)
 			if s != null:
-				prompt = "E  open chest" if s.kind == "chest" else "E  use workbench"
-		if prompt != "":
-			_text_centered(h * 0.62, prompt, 18, Color(1, 1, 0.8))
+				what = "open chest" if s.kind == "chest" else "use workbench"
+		if what != "":
+			_text_centered(h * 0.62, prompt("interact") + "  " + what, 18, Color(1, 1, 0.8))
 
 	# Big message at the top.
 	if _message_time > 0.0:
 		var a := clampf(_message_time, 0.0, 1.0)
 		_text_centered(110, _message, 24, Color(1, 1, 1, a))
 
-	# Controls reminder.
-	_text(Vector2(20, h - 16), "WASD move   LMB ranged   RMB melee / gather   Space dodge   Q shockwave   R reload   E use   F eat   H heal   Tab character", 14, Color(1, 1, 1, 0.55))
+	# Controls reminder for whatever you are playing with.
+	_text(Vector2(20, h - 16), CONTROL_HINTS[p.prompt_style()], 14, Color(1, 1, 1, 0.55))
 
 	if game.game_over:
 		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.65))
 		_text_centered(h / 2 - 30, "YOU DIED", 48, Color(0.9, 0.2, 0.2))
 		_text_centered(h / 2 + 15, "Survived to day %d with %d kills" % [game.day, game.kills], 20)
-		_text_centered(h / 2 + 50, "Press Enter to try again", 18, Color(1, 1, 1, 0.8))
+		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
+
+
+## Button name for an action, matching the device in use.
+## Example: prompt("interact") = "E", "X" (Xbox) or "Square" (PlayStation).
+func prompt(action: String) -> String:
+	var style: String = game.player.prompt_style() if game and game.player else "keyboard"
+	return PROMPTS[style].get(action, action)
 
 
 func _bar(pos: Vector2, label: String, fill: float, color: Color) -> void:
