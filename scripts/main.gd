@@ -12,6 +12,11 @@ const PlayerScript := preload("res://scripts/player.gd")
 const ZombieScript := preload("res://scripts/zombie.gd")
 const CrateScript := preload("res://scripts/loot_crate.gd")
 const HudScript := preload("res://scripts/hud.gd")
+const ResourceScript := preload("res://scripts/resource_node.gd")
+const StructureScript := preload("res://scripts/structure.gd")
+const InventoryUiScript := preload("res://scripts/inventory_ui.gd")
+const PlacementScript := preload("res://scripts/placement.gd")
+const FloatingTextScript := preload("res://scripts/floating_text.gd")
 
 const DAY_COLOR := Color(1, 1, 1)
 const NIGHT_COLOR := Color(0.28, 0.32, 0.5)
@@ -19,8 +24,16 @@ const NIGHT_COLOR := Color(0.28, 0.32, 0.5)
 var player: CharacterBody2D
 var hud: Control
 var tint: CanvasModulate
-var items_node: Node2D    # crates (drawn under characters)
+var items_node: Node2D    # crates, trees, rocks, chests (drawn under characters)
 var world_node: Node2D    # player, zombies, bullets
+var ui: Control           # inventory / crafting window
+var placement: Node2D     # green/red outline when placing a chest or workbench
+var placing := ""         # item id being placed, "" when not placing
+
+## True while the inventory window is open (combat is paused for the player).
+var ui_open: bool:
+	get:
+		return ui != null and ui.visible
 
 var day := 1
 var is_night := false
@@ -46,9 +59,10 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_hud()
 	_spawn_crates()
+	_spawn_resources()
 	for i in 12:
 		spawn_zombie(_random_spawn_point(500, 1300), false)
-	hud.show_message("Day 1 - scavenge supplies before night falls", 5.0)
+	hud.show_message("Day 1 - gather wood and stone, press Tab to craft", 5.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -159,6 +173,86 @@ func point_is_free(p: Vector2) -> bool:
 	return true
 
 
+func spawn_resource(kind: String, pos: Vector2) -> StaticBody2D:
+	var node: StaticBody2D = ResourceScript.new()
+	node.position = pos
+	node.setup(kind)
+	items_node.add_child(node)
+	return node
+
+
+func spawn_structure(kind: String, pos: Vector2) -> StaticBody2D:
+	var s: StaticBody2D = StructureScript.new()
+	s.position = pos
+	s.setup(kind)
+	items_node.add_child(s)
+	return s
+
+
+func floating_text(pos: Vector2, text: String, color: Color = Color.WHITE) -> void:
+	var f: Node2D = FloatingTextScript.new()
+	f.position = pos
+	f.text = text
+	f.color = color
+	f.z_index = 20
+	world_node.add_child(f)
+
+
+# ---------------------------------------------------------------- building
+
+func snap(pos: Vector2) -> Vector2:
+	return (pos / 16.0).round() * 16.0
+
+
+func start_placing(id: String) -> void:
+	placing = id
+
+
+func cancel_placing() -> void:
+	placing = ""
+
+
+## Checks that a structure fits here without overlapping anything.
+func can_place(kind: String, pos: Vector2) -> bool:
+	var size: Vector2 = StructureScript.SIZES[kind]
+	var rect := Rect2(pos - size / 2, size)
+	if not Rect2(Vector2(40, 40), WORLD_SIZE - Vector2(80, 80)).encloses(rect):
+		return false
+	for r in ruins:
+		if r.grow(4).intersects(rect):
+			return false
+	for s in get_tree().get_nodes_in_group("structures"):
+		if s.rect().grow(4).intersects(rect):
+			return false
+	for n in get_tree().get_nodes_in_group("resources"):
+		if rect.grow(n.radius + 2).has_point(n.global_position):
+			return false
+	for body in [player] + get_tree().get_nodes_in_group("zombies"):
+		if rect.grow(body.radius).has_point(body.global_position):
+			return false
+	return true
+
+
+func nearest_structure(pos: Vector2, max_dist: float, kind: String = "") -> Node2D:
+	var best: Node2D = null
+	var best_d := max_dist
+	for s in get_tree().get_nodes_in_group("structures"):
+		if kind != "" and s.kind != kind:
+			continue
+		var d: float = s.global_position.distance_to(pos)
+		if d <= best_d:
+			best_d = d
+			best = s
+	return best
+
+
+## Moves up to `amount` of an item from one inventory to another. Returns how many moved.
+func transfer(from_inv, to_inv, id: String, amount: int) -> int:
+	var moved: int = to_inv.add(id, mini(amount, from_inv.count(id)))
+	from_inv.remove(id, moved)
+	return moved
+
+
 # ---------------------------------------------------------------- events used by other scripts
 
 ## Gunshots and fights make noise. Zombies inside the radius come to look.
@@ -267,6 +361,40 @@ func _spawn_hud() -> void:
 	hud.game = self
 	layer.add_child(hud)
 
+	var ui_layer := CanvasLayer.new()
+	ui_layer.layer = 2
+	add_child(ui_layer)
+	ui = InventoryUiScript.new()
+	ui.game = self
+	ui_layer.add_child(ui)
+
+	placement = PlacementScript.new()
+	placement.game = self
+	world_node.add_child(placement)
+
+
+func _spawn_resources() -> void:
+	var center := WORLD_SIZE / 2
+	# A few close to the start, so you can begin gathering right away.
+	var near := [["tree", 240.0, 0.9], ["tree", 280.0, 2.2], ["tree", 300.0, 4.0],
+		["rock", 260.0, 1.5], ["rock", 290.0, 3.4], ["scrap", 250.0, 5.2]]
+	for n in near:
+		spawn_resource(n[0], center + Vector2.from_angle(n[2]) * n[1])
+	# The rest scattered over the map, keeping off the roads.
+	var counts := {"tree": 90, "rock": 45, "scrap": 35}
+	for kind in counts:
+		var placed := 0
+		var tries := 0
+		while placed < counts[kind] and tries < 2000:
+			tries += 1
+			var p := Vector2(rng.randf_range(80, WORLD_SIZE.x - 80), rng.randf_range(80, WORLD_SIZE.y - 80))
+			if not point_is_free(p) or p.distance_to(center) < 350:
+				continue
+			if absf(p.x - center.x) < 90 or absf(p.y - center.y) < 90:
+				continue
+			spawn_resource(kind, p)
+			placed += 1
+
 
 func _spawn_crates() -> void:
 	var center := WORLD_SIZE / 2
@@ -309,6 +437,11 @@ static func setup_input() -> void:
 	_add_key("interact", KEY_E)
 	_add_key("eat", KEY_F)
 	_add_key("restart", KEY_ENTER)
+	_add_key("heal", KEY_H)
+	if not InputMap.has_action("inventory"):
+		_add_key("inventory", KEY_TAB)
+		InputMap.action_add_event("inventory", _key_event(KEY_I))
+	_add_key("close_ui", KEY_ESCAPE)
 	_add_mouse("shoot", MOUSE_BUTTON_LEFT)
 	_add_mouse("melee", MOUSE_BUTTON_RIGHT)
 
@@ -317,9 +450,13 @@ static func _add_key(action: String, key: Key) -> void:
 	if InputMap.has_action(action):
 		return
 	InputMap.add_action(action)
+	InputMap.action_add_event(action, _key_event(key))
+
+
+static func _key_event(key: Key) -> InputEventKey:
 	var ev := InputEventKey.new()
 	ev.physical_keycode = key
-	InputMap.action_add_event(action, ev)
+	return ev
 
 
 static func _add_mouse(action: String, button: MouseButton) -> void:

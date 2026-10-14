@@ -25,15 +25,33 @@ const HUNGER_DRAIN := 0.35      # per second, 100 = full
 const STARVE_DAMAGE := 3.0      # per second when hunger is 0
 const REGEN := 0.6              # health per second when well fed
 
+const HEAL_BANDAGE := 25.0
+const HEAL_MEDKIT := 60.0
+const WORKBENCH_RANGE := 90.0
+
 const BulletScript := preload("res://scripts/bullet.gd")
+const InventoryScript := preload("res://scripts/inventory.gd")
+const Items := preload("res://scripts/items.gd")
 
 var radius := 14.0
 var max_health := 100.0
 var health := 100.0
 var hunger := 100.0
 var ammo_in_mag := MAG_SIZE
-var ammo_reserve := 24
-var food := 1
+var inventory = InventoryScript.new()
+
+## Spare ammo and food live in the inventory. These are shortcuts to them.
+var ammo_reserve: int:
+	get:
+		return inventory.count("ammo")
+	set(value):
+		inventory.set_count("ammo", value)
+
+var food: int:
+	get:
+		return inventory.count("food")
+	set(value):
+		inventory.set_count("food", value)
 
 var aim_dir := Vector2.RIGHT
 var dodge_dir := Vector2.ZERO
@@ -50,11 +68,18 @@ var shock_flash := 0.0
 var muzzle_flash := 0.0
 var hurt_flash := 0.0
 
+var action_block := 0.0   # short pause on shooting after placing something
 var dead := false
 var controls_enabled := true
 var use_mouse_aim := true
 var game: Node
 var light: PointLight2D
+
+
+func _init() -> void:
+	# Starting kit.
+	inventory.add("ammo", 24)
+	inventory.add("food", 1)
 
 
 func _ready() -> void:
@@ -119,10 +144,14 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	if controls_enabled:
-		if Input.is_action_pressed("shoot"):
+		# No fighting while the inventory is open or while placing a structure.
+		var can_fight: bool = not game.ui_open and game.placing == "" and action_block <= 0.0
+		if can_fight and Input.is_action_pressed("shoot"):
 			shoot()
-		if Input.is_action_pressed("melee"):
+		if can_fight and Input.is_action_pressed("melee"):
 			melee()
+		if Input.is_action_just_pressed("heal"):
+			heal()
 		if Input.is_action_just_pressed("dodge"):
 			dodge(move)
 		if Input.is_action_just_pressed("ability"):
@@ -145,6 +174,7 @@ func _tick_timers(delta: float) -> void:
 	shock_flash = maxf(shock_flash - delta, 0.0)
 	muzzle_flash = maxf(muzzle_flash - delta, 0.0)
 	hurt_flash = maxf(hurt_flash - delta, 0.0)
+	action_block = maxf(action_block - delta, 0.0)
 	if dodge_timer > 0.0:
 		dodge_timer -= delta
 		if dodge_timer <= 0.0:
@@ -214,6 +244,17 @@ func melee() -> bool:
 			continue
 		z.take_damage(MELEE_DAMAGE, to.normalized() * 380.0)
 		hits += 1
+	# The same swing chops trees, breaks rocks and pulls apart scrap.
+	for r in get_tree().get_nodes_in_group("resources"):
+		if r.depleted:
+			continue
+		var to: Vector2 = r.global_position - global_position
+		if to.length() > MELEE_RANGE + r.radius:
+			continue
+		if absf(aim_dir.angle_to(to)) > MELEE_ARC:
+			continue
+		r.gather(self)
+		hits += 1
 	game.make_noise(global_position, MELEE_NOISE)
 	return hits > 0
 
@@ -255,27 +296,94 @@ func eat() -> bool:
 	return true
 
 
-## Search the nearest crate within reach.
+## E key: search a crate, open a chest, or use a workbench (whatever is closest).
 func interact() -> bool:
 	if dead:
 		return false
+	if game.ui_open:
+		game.ui.close()
+		return true
 	var crate: Node2D = game.nearest_crate(global_position, 48.0)
-	if crate == null:
-		return false
+	if crate != null:
+		return _search_crate(crate)
+	var s: Node2D = game.nearest_structure(global_position, 64.0)
+	if s != null:
+		if s.kind == "chest":
+			game.ui.open_chest(s)
+		else:
+			game.ui.open()
+		return true
+	return false
+
+
+func _search_crate(crate: Node2D) -> bool:
 	var loot: Dictionary = crate.open()
 	if loot.is_empty():
 		return false
-	ammo_reserve += loot.ammo
-	food += loot.food
-	health = minf(health + loot.medkit * 30.0, max_health)
 	var parts: Array[String] = []
-	if loot.ammo > 0:
-		parts.append("%d ammo" % loot.ammo)
-	if loot.food > 0:
-		parts.append("%d food" % loot.food)
-	if loot.medkit > 0:
-		parts.append("a medkit")
-	game.hud.show_message("Found " + ", ".join(parts), 2.0)
+	var left_behind := false
+	for id in loot:
+		var added: int = inventory.add(id, loot[id])
+		if added > 0:
+			parts.append("%d %s" % [added, Items.display_name(id)])
+		if added < loot[id]:
+			left_behind = true
+	var msg := "Found " + ", ".join(parts) if not parts.is_empty() else "Found nothing useful"
+	if left_behind:
+		msg += "  (inventory full, some left behind)"
+	game.hud.show_message(msg, 2.5)
+	return true
+
+
+## H key: use a bandage, or a medkit if you have no bandages.
+func heal() -> bool:
+	if inventory.count("bandage") > 0:
+		return heal_with("bandage")
+	return heal_with("medkit")
+
+
+func heal_with(id: String) -> bool:
+	if dead or health >= max_health or not inventory.remove(id, 1):
+		return false
+	health = minf(health + (HEAL_BANDAGE if id == "bandage" else HEAL_MEDKIT), max_health)
+	return true
+
+
+# ---------------------------------------------------------------- crafting and building
+
+func near_workbench() -> bool:
+	return game.nearest_structure(global_position, WORKBENCH_RANGE, "workbench") != null
+
+
+func can_craft(id: String) -> bool:
+	var r: Dictionary = Items.recipe(id)
+	if r.is_empty() or dead:
+		return false
+	if r["bench"] and not near_workbench():
+		return false
+	if not inventory.has_all(r["cost"]):
+		return false
+	return inventory.space_for(id) >= r["amount"]
+
+
+func craft(id: String) -> bool:
+	if not can_craft(id):
+		return false
+	var r: Dictionary = Items.recipe(id)
+	inventory.remove_all(r["cost"])
+	inventory.add(id, r["amount"])
+	game.floating_text(global_position + Vector2(0, -30), "Crafted %s" % Items.display_name(id), Color(0.6, 1, 0.6))
+	return true
+
+
+## Puts a chest or workbench from your inventory into the world.
+func place_structure(id: String, pos: Vector2) -> bool:
+	if dead or inventory.count(id) <= 0 or not game.can_place(id, pos):
+		return false
+	inventory.remove(id, 1)
+	game.spawn_structure(id, pos)
+	game.cancel_placing()
+	action_block = 0.25
 	return true
 
 

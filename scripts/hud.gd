@@ -36,7 +36,9 @@ func _draw() -> void:
 	_bar(Vector2(20, 50), "Hunger", p.hunger / 100.0, Color(0.85, 0.6, 0.2))
 	var reload_txt := "  reloading..." if p.reload_timer > 0.0 else ""
 	_text(Vector2(20, 100), "Ammo  %d / %d%s" % [p.ammo_in_mag, p.ammo_reserve, reload_txt])
-	_text(Vector2(20, 124), "Food  %d   (F to eat)" % p.food)
+	var inv = p.inventory
+	_text(Vector2(20, 124), "Food %d   Bandages %d   Medkits %d" % [p.food, inv.count("bandage"), inv.count("medkit")])
+	_text(Vector2(20, 172), "Wood %d   Stone %d   Scrap %d   Cloth %d" % [inv.count("wood"), inv.count("stone"), inv.count("scrap"), inv.count("cloth")], 14, Color(1, 1, 1, 0.75))
 	_text(Vector2(20, 148), "Dodge %s    Shockwave %s" % [_cd(p.dodge_cd), _cd(p.shock_cd)])
 
 	# Right: clock and kills.
@@ -46,9 +48,17 @@ func _draw() -> void:
 	_text(Vector2(w - 260, 34), clock, 22, clock_color)
 	_text(Vector2(w - 260, 60), "Kills %d" % game.kills)
 
-	# Prompt when standing next to a crate.
-	if not p.dead and game.nearest_crate(p.global_position, 48.0) != null:
-		_text_centered(h * 0.62, "E  search", 18, Color(1, 1, 0.8))
+	# Prompt when standing next to something you can use.
+	if not p.dead and not game.ui_open:
+		var prompt := ""
+		if game.nearest_crate(p.global_position, 48.0) != null:
+			prompt = "E  search"
+		else:
+			var s = game.nearest_structure(p.global_position, 64.0)
+			if s != null:
+				prompt = "E  open chest" if s.kind == "chest" else "E  use workbench"
+		if prompt != "":
+			_text_centered(h * 0.62, prompt, 18, Color(1, 1, 0.8))
 
 	# Big message at the top.
 	if _message_time > 0.0:
@@ -56,7 +66,7 @@ func _draw() -> void:
 		_text_centered(110, _message, 24, Color(1, 1, 1, a))
 
 	# Controls reminder.
-	_text(Vector2(20, h - 16), "WASD move   LMB shoot   RMB swing   Space dodge   Q shockwave   R reload   E search   F eat", 14, Color(1, 1, 1, 0.55))
+	_text(Vector2(20, h - 16), "WASD move   LMB shoot   RMB swing / gather   Space dodge   Q shockwave   R reload   E use   F eat   H heal   Tab inventory", 14, Color(1, 1, 1, 0.55))
 
 	if game.game_over:
 		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.65))

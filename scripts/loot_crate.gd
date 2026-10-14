@@ -3,18 +3,23 @@ extends Node2D
 
 var opened := false
 var small := false
-var ammo := 0
-var food := 0
-var medkit := 0
+var loot := {}   # item id -> amount
 
 
 func setup(rng: RandomNumberGenerator, is_small: bool) -> void:
 	small = is_small
-	ammo = rng.randi_range(0, 6 if small else 10)
-	food = rng.randi_range(0, 1 if small else 2)
-	medkit = 1 if rng.randf() < 0.2 else 0
-	if ammo + food + medkit == 0:
-		ammo = 4
+	var roll := {
+		"ammo": rng.randi_range(0, 6 if small else 10),
+		"food": rng.randi_range(0, 1 if small else 2),
+		"cloth": rng.randi_range(0, 2 if small else 3),
+		"scrap": rng.randi_range(0, 1 if small else 2),
+		"medkit": 1 if rng.randf() < 0.15 else 0,
+	}
+	for id in roll:
+		if roll[id] > 0:
+			loot[id] = roll[id]
+	if loot.is_empty():
+		loot["ammo"] = 4
 
 
 func _ready() -> void:
@@ -27,7 +32,7 @@ func open() -> Dictionary:
 		return {}
 	opened = true
 	queue_redraw()
-	return {"ammo": ammo, "food": food, "medkit": medkit}
+	return loot
 
 
 func _draw() -> void:

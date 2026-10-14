@@ -202,6 +202,98 @@ func _run() -> void:
 	check(not still_horde, "horde calms down at dawn")
 	await clear_zombies()
 
+	# --- inventory basics
+	var Inv = load("res://scripts/inventory.gd")
+	var bag = Inv.new()
+	bag.max_slots = 2
+	check(bag.add("wood", 70) == 70 and bag.slots_used() == 2, "items stack (70 wood = 2 slots)")
+	check(bag.add("stone", 5) == 0, "a full bag refuses new items")
+	check(bag.add("wood", 40) == 30, "only what fits gets added")
+	check(bag.remove("wood", 100) and bag.count("wood") == 0 and bag.is_empty(), "removing items frees space")
+	check(not bag.remove("wood", 1), "cannot remove what you don't have")
+
+	# --- gathering
+	reset_player()
+	p.inventory.set_count("wood", 0)
+	var tree = game.spawn_resource("tree", p.position + Vector2(50, 0))
+	await frames(1)
+	check(p.melee(), "melee hits a tree")
+	check(p.inventory.count("wood") >= 2, "chopping a tree gives wood")
+	for i in 5:
+		p.melee_cd = 0.0
+		p.melee()
+		await frames(1)
+	check(not is_instance_valid(tree), "a tree disappears after its last hit")
+	var rock = game.spawn_resource("rock", p.position + Vector2(55, 0))
+	await frames(1)
+	p.melee_cd = 0.0
+	p.melee()
+	check(p.inventory.count("stone") >= 1, "breaking a rock gives stone")
+	rock.queue_free()
+	await frames(1)
+
+	# --- crafting
+	reset_player()
+	var inv = p.inventory
+	for id in ["wood", "stone", "scrap", "cloth", "workbench", "chest", "bandage", "medkit"]:
+		inv.set_count(id, 0)
+	check(not p.can_craft("workbench"), "cannot craft without materials")
+	inv.set_count("wood", 30)
+	inv.set_count("stone", 10)
+	inv.set_count("scrap", 10)
+	inv.set_count("cloth", 10)
+	check(p.craft("workbench"), "craft a workbench")
+	check(inv.count("workbench") == 1 and inv.count("wood") == 20 and inv.count("stone") == 6, "crafting uses the right materials")
+	check(p.craft("chest") and inv.count("chest") == 1, "craft a chest")
+	check(p.craft("bandage") and inv.count("bandage") == 1, "craft a bandage by hand")
+	check(not p.can_craft("ammo"), "ammo needs a workbench")
+
+	# --- placing
+	var spot: Vector2 = game.snap(p.position + Vector2(0, -80))
+	check(game.can_place("workbench", spot), "free spot is placeable")
+	check(not game.can_place("workbench", game.snap(p.position)), "cannot place on top of yourself")
+	var ruin: Rect2 = game.ruins[0]
+	check(not game.can_place("chest", ruin.get_center()), "cannot place inside a ruin")
+	check(p.place_structure("workbench", spot), "place the workbench")
+	check(inv.count("workbench") == 0 and get_nodes_in_group("structures").size() == 1, "workbench is now in the world")
+	check(not game.can_place("chest", spot), "cannot place two things in one spot")
+	check(p.near_workbench(), "player is near the workbench")
+	var ammo_before: int = p.ammo_reserve
+	check(p.craft("ammo") and p.ammo_reserve == ammo_before + 6, "craft ammo at the workbench")
+	check(p.craft("medkit"), "craft a medkit at the workbench")
+
+	# --- chest storage
+	var chest_spot: Vector2 = game.snap(p.position + Vector2(-80, 0))
+	check(p.place_structure("chest", chest_spot), "place the chest")
+	var chest = game.nearest_structure(chest_spot, 5.0, "chest")
+	check(chest != null and chest.storage != null, "chest has storage")
+	var wood_now: int = inv.count("wood")
+	check(game.transfer(inv, chest.storage, "wood", wood_now) == wood_now, "store wood in the chest")
+	check(inv.count("wood") == 0 and chest.storage.count("wood") == wood_now, "wood moved into the chest")
+	game.transfer(chest.storage, inv, "wood", wood_now)
+	check(inv.count("wood") == wood_now and chest.storage.is_empty(), "take wood back out")
+
+	# --- healing
+	p.health = 50.0
+	check(p.heal() and p.health == 75.0, "bandage heals 25")
+	p.health = 30.0
+	check(p.heal() and p.health == 90.0, "medkit heals 60 when out of bandages")
+
+	# --- inventory window
+	game.ui.open()
+	await frames(1)
+	check(game.ui_open, "inventory window opens")
+	game.ui.close()
+	check(not game.ui_open, "inventory window closes")
+	game.ui.open_chest(chest)
+	await frames(1)
+	check(game.ui_open and game.ui.chest == chest, "chest window opens")
+	p.position += Vector2(400, 0)
+	await frames(3)
+	check(not game.ui_open, "chest window closes when you walk away")
+	p.position -= Vector2(400, 0)
+	await frames(1)
+
 	# --- death
 	reset_player()
 	p.take_damage(1000)
