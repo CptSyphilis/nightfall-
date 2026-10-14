@@ -1,7 +1,9 @@
 extends CharacterBody2D
 ## The survivor you control.
-## WASD move, mouse aims, left click shoots, right click swings,
+## WASD move, mouse aims, left click fires your ranged weapon,
+## right click swings your melee weapon,
 ## Space dodges (you are invulnerable while rolling), Q is a shockwave.
+## Weapon stats live in items.gd (WEAPONS).
 
 signal died
 
@@ -9,12 +11,7 @@ const SPEED := 210.0
 const DODGE_SPEED := 620.0
 const DODGE_TIME := 0.22
 const DODGE_COOLDOWN := 1.0
-const MELEE_COOLDOWN := 0.45
-const MELEE_RANGE := 70.0
-const MELEE_ARC := 1.2          # radians to each side of the aim direction
-const MELEE_DAMAGE := 35.0
 const MELEE_NOISE := 160.0
-const SHOOT_COOLDOWN := 0.18
 const GUN_NOISE := 650.0
 const MAG_SIZE := 12
 const RELOAD_TIME := 1.4
@@ -37,8 +34,12 @@ var radius := 14.0
 var max_health := 100.0
 var health := 100.0
 var hunger := 100.0
-var ammo_in_mag := MAG_SIZE
+var ammo_in_mag := MAG_SIZE     # rounds loaded in the pistol
 var inventory = InventoryScript.new()
+
+## Equipped weapons. "fists" = no melee weapon, "" = no ranged weapon.
+var melee_weapon := "fists"
+var ranged_weapon := "pistol"
 
 ## Spare ammo and food live in the inventory. These are shortcuts to them.
 var ammo_reserve: int:
@@ -78,6 +79,7 @@ var light: PointLight2D
 
 func _init() -> void:
 	# Starting kit.
+	inventory.add("pistol", 1)
 	inventory.add("ammo", 24)
 	inventory.add("food", 1)
 
@@ -197,24 +199,74 @@ func _tick_survival(delta: float) -> void:
 
 # ---------------------------------------------------------------- actions
 
+## Stats of the equipped melee weapon (falls back to fists if it is gone).
+func melee_stats() -> Dictionary:
+	if melee_weapon != "fists" and inventory.count(melee_weapon) <= 0:
+		melee_weapon = "fists"
+	return Items.weapon(melee_weapon)
+
+
+## Stats of the equipped ranged weapon, or {} if none.
+func ranged_stats() -> Dictionary:
+	if ranged_weapon != "" and inventory.count(ranged_weapon) <= 0:
+		ranged_weapon = ""
+		reload_timer = 0.0
+	return Items.weapon(ranged_weapon)
+
+
+## Equip a weapon from your inventory into the right slot.
+func equip(id: String) -> bool:
+	if not Items.is_weapon(id) or inventory.count(id) <= 0:
+		return false
+	if Items.weapon(id)["type"] == "melee":
+		melee_weapon = id
+	else:
+		ranged_weapon = id
+		reload_timer = 0.0
+	return true
+
+
+## Empty a slot. "melee" goes back to fists, "ranged" to nothing.
+func unequip(slot: String) -> void:
+	if slot == "melee":
+		melee_weapon = "fists"
+	else:
+		ranged_weapon = ""
+		reload_timer = 0.0
+
+
 func shoot() -> bool:
-	if dead or shoot_cd > 0.0 or reload_timer > 0.0:
+	var w := ranged_stats()
+	if dead or w.is_empty() or shoot_cd > 0.0 or reload_timer > 0.0:
 		return false
-	if ammo_in_mag <= 0:
-		start_reload()
-		return false
-	ammo_in_mag -= 1
-	shoot_cd = SHOOT_COOLDOWN
-	muzzle_flash = 0.06
+	if w["magazine"] > 0:
+		# Guns: fire from the magazine, reload from spare ammo.
+		if ammo_in_mag <= 0:
+			start_reload()
+			return false
+		ammo_in_mag -= 1
+		muzzle_flash = 0.06
+	else:
+		# Bows: each shot takes one arrow straight from the inventory.
+		if not inventory.remove(w["ammo"], 1):
+			return false
+	shoot_cd = w["cooldown"]
 	var b: Node2D = BulletScript.new()
 	b.position = global_position + aim_dir * (radius + 8.0)
 	b.direction = aim_dir
+	b.damage = w["damage"]
+	b.speed = w["speed"]
+	b.life = w["life"]
+	b.style = w["style"]
 	game.world_node.add_child(b)
-	game.make_noise(global_position, GUN_NOISE)
+	game.make_noise(global_position, w["noise"])
 	return true
 
 
 func start_reload() -> bool:
+	var w := ranged_stats()
+	if w.is_empty() or w["magazine"] <= 0:
+		return false
 	if reload_timer > 0.0 or ammo_in_mag >= MAG_SIZE or ammo_reserve <= 0:
 		return false
 	reload_timer = RELOAD_TIME
@@ -231,32 +283,42 @@ func _finish_reload() -> void:
 func melee() -> bool:
 	if dead or melee_cd > 0.0:
 		return false
-	melee_cd = MELEE_COOLDOWN
+	var w := melee_stats()
+	var reach: float = w["range"]
+	var arc: float = w["arc"]
+	melee_cd = w["cooldown"]
 	swing_flash = 0.15
 	var hits := 0
 	for z in get_tree().get_nodes_in_group("zombies"):
 		if z.dead:
 			continue
 		var to: Vector2 = z.global_position - global_position
-		if to.length() > MELEE_RANGE + z.radius:
+		if to.length() > reach + z.radius:
 			continue
-		if absf(aim_dir.angle_to(to)) > MELEE_ARC:
+		if absf(aim_dir.angle_to(to)) > arc + _arc_slack(to.length(), z.radius):
 			continue
-		z.take_damage(MELEE_DAMAGE, to.normalized() * 380.0)
+		z.take_damage(w["damage"], to.normalized() * w["knockback"])
 		hits += 1
 	# The same swing chops trees, breaks rocks and pulls apart scrap.
+	var gather_bonus: Dictionary = w.get("gather", {})
 	for r in get_tree().get_nodes_in_group("resources"):
 		if r.depleted:
 			continue
 		var to: Vector2 = r.global_position - global_position
-		if to.length() > MELEE_RANGE + r.radius:
+		if to.length() > reach + r.radius:
 			continue
-		if absf(aim_dir.angle_to(to)) > MELEE_ARC:
+		if absf(aim_dir.angle_to(to)) > arc + _arc_slack(to.length(), r.radius):
 			continue
-		r.gather(self)
+		r.gather(self, gather_bonus.get(r.kind, 1))
 		hits += 1
 	game.make_noise(global_position, MELEE_NOISE)
 	return hits > 0
+
+
+## Extra angle so a narrow thrust (spear) still hits a target whose body
+## overlaps the line, even if its center is slightly off to the side.
+func _arc_slack(dist: float, target_radius: float) -> float:
+	return atan2(target_radius, maxf(dist, 1.0)) * 0.6
 
 
 ## Quick roll. You pass through zombies and take no damage while rolling.
@@ -412,12 +474,67 @@ func _draw() -> void:
 		draw_circle(-dodge_dir * 16.0, radius, Color(body, 0.3))
 	draw_circle(Vector2.ZERO, radius + 2.0, Color(0.08, 0.08, 0.1))
 	draw_circle(Vector2.ZERO, radius, body)
-	draw_line(aim_dir * 6.0, aim_dir * (radius + 12.0), Color(0.12, 0.12, 0.12), 5.0)
+	if swing_flash > 0.0:
+		_draw_swing()
+	else:
+		_draw_ranged_weapon()
 	if muzzle_flash > 0.0:
 		draw_circle(aim_dir * (radius + 16.0), 6.0, Color(1, 0.85, 0.4))
-	if swing_flash > 0.0:
-		var a := aim_dir.angle()
-		draw_arc(Vector2.ZERO, MELEE_RANGE * 0.8, a - MELEE_ARC, a + MELEE_ARC, 16, Color(1, 1, 1, 0.7), 4.0)
 	if shock_flash > 0.0:
 		var k := shock_flash / 0.3
 		draw_arc(Vector2.ZERO, SHOCK_RADIUS * (1.0 - k), 0.0, TAU, 40, Color(0.6, 0.8, 1.0, k), 6.0)
+
+
+## The ranged weapon held in front of you.
+func _draw_ranged_weapon() -> void:
+	var dark := Color(0.12, 0.12, 0.12)
+	var wood := Color(0.5, 0.33, 0.18)
+	var side := aim_dir.orthogonal()
+	match ranged_weapon:
+		"pistol":
+			draw_line(aim_dir * 6.0, aim_dir * (radius + 12.0), dark, 5.0)
+		"bow":
+			var c := aim_dir * 12.0
+			var a := aim_dir.angle()
+			draw_arc(c, 14.0, a - 1.3, a + 1.3, 12, wood, 3.0)
+			draw_line(c + Vector2.from_angle(a - 1.3) * 14.0, c + Vector2.from_angle(a + 1.3) * 14.0, Color(0.9, 0.9, 0.85), 1.0)
+		"crossbow":
+			draw_line(aim_dir * 4.0, aim_dir * (radius + 14.0), wood, 5.0)
+			var tip := aim_dir * (radius + 8.0)
+			draw_line(tip - side * 11.0, tip + side * 11.0, dark, 3.0)
+
+
+## The melee weapon sweeping through its arc during a swing.
+func _draw_swing() -> void:
+	var w := melee_stats()
+	var reach: float = w["range"]
+	var arc: float = w["arc"]
+	var a := aim_dir.angle()
+	var t := 1.0 - swing_flash / 0.15        # 0 -> 1 over the swing
+	if melee_weapon == "spear":
+		# A straight thrust forward.
+		var tip := aim_dir * lerpf(radius, reach, sin(t * PI))
+		draw_line(aim_dir * 4.0, tip, Color(0.5, 0.35, 0.2), 4.0)
+		draw_line(tip, tip + aim_dir * 10.0, Color(0.75, 0.75, 0.78), 5.0)
+		return
+	draw_arc(Vector2.ZERO, reach * 0.8, a - arc, a + arc, 16, Color(1, 1, 1, 0.35), 3.0)
+	var dir := Vector2.from_angle(a - arc + 2.0 * arc * t)
+	var color := Color(0.5, 0.35, 0.2)
+	var width := 6.0
+	match melee_weapon:
+		"fists":
+			draw_circle(dir * (radius + 6.0), 6.0, Color(0.85, 0.7, 0.55))
+			return
+		"machete":
+			color = Color(0.8, 0.8, 0.85)
+			width = 4.0
+		"spiked_club":
+			width = 8.0
+	draw_line(dir * 8.0, dir * reach * 0.85, color, width)
+	var head := dir * reach * 0.85
+	if melee_weapon == "stone_axe":
+		draw_line(head - dir.orthogonal() * 8.0, head + dir.orthogonal() * 4.0, Color(0.55, 0.55, 0.58), 7.0)
+	elif melee_weapon == "spiked_club":
+		for k in 3:
+			var s := head - dir * (k * 8.0)
+			draw_line(s - dir.orthogonal() * 7.0, s + dir.orthogonal() * 7.0, Color(0.7, 0.7, 0.72), 2.0)

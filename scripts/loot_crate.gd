@@ -14,7 +14,11 @@ func setup(rng: RandomNumberGenerator, is_small: bool) -> void:
 		"cloth": rng.randi_range(0, 2 if small else 3),
 		"scrap": rng.randi_range(0, 1 if small else 2),
 		"medkit": 1 if rng.randf() < 0.15 else 0,
+		"arrow": rng.randi_range(2, 6) if rng.randf() < 0.2 else 0,
 	}
+	# Big crates sometimes hold a weapon.
+	if not small and rng.randf() < 0.08:
+		roll[["machete", "club", "bow"][rng.randi_range(0, 2)]] = 1
 	for id in roll:
 		if roll[id] > 0:
 			loot[id] = roll[id]

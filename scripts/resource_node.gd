@@ -42,12 +42,13 @@ func _ready() -> void:
 
 
 ## Called by the player's melee swing. Puts materials in their inventory.
-func gather(by: Node) -> int:
+## multiplier > 1 when using the right tool (stone axe on trees, machete on scrap).
+func gather(by: Node, multiplier: int = 1) -> int:
 	if depleted:
 		return 0
 	var info: Dictionary = KINDS[kind]
 	var item: String = info["item"]
-	var amount := _rng.randi_range(info["min"], info["max"])
+	var amount: int = _rng.randi_range(info["min"], info["max"]) * multiplier
 	var added: int = by.inventory.add(item, amount)
 	var text := "+%d %s" % [added, Items.display_name(item)]
 	# Scrap piles sometimes have old clothes in them.

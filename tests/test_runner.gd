@@ -90,8 +90,13 @@ func _run() -> void:
 	check(not is_instance_valid(z) or z.health < hp0, "bullet hits the zombie")
 	await clear_zombies()
 
-	# --- melee kill
+	# --- starting equipment
+	check(p.ranged_weapon == "pistol" and p.melee_weapon == "fists", "you start with a pistol and fists")
+
+	# --- melee kill (with a club)
 	reset_player()
+	p.inventory.set_count("club", 1)
+	check(p.equip("club") and p.melee_weapon == "club", "equip a club")
 	var kills0: int = game.kills
 	z = game.spawn_zombie(p.position + Vector2(40, 0), false)
 	await frames(1)
@@ -144,6 +149,11 @@ func _run() -> void:
 
 	# --- looting
 	reset_player()
+	# Zombies killed earlier can drop a bag nearby; clear those first.
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	await frames(1)
 	var crate = game.spawn_crate(p.position + Vector2(20, 0), false)
 	await frames(1)
 	var before: int = p.ammo_reserve + p.food
@@ -293,6 +303,105 @@ func _run() -> void:
 	check(not game.ui_open, "chest window closes when you walk away")
 	p.position -= Vector2(400, 0)
 	await frames(1)
+
+	# --- weapons
+	reset_player()
+	for id in ["club", "stone_axe", "spear", "bow", "crossbow", "machete", "spiked_club"]:
+		p.inventory.set_count(id, 0)
+	p.unequip("melee")
+	p.inventory.set_count("wood", 40)
+	p.inventory.set_count("stone", 10)
+	p.inventory.set_count("cloth", 6)
+	check(p.craft("club") and p.craft("stone_axe") and p.craft("spear") and p.craft("bow"), "craft club, stone axe, spear and bow by hand")
+	check(not p.can_craft("crossbow") or p.near_workbench(), "crossbow needs a workbench")
+
+	# Fists are weak.
+	z = game.spawn_zombie(p.position + Vector2(40, 0), false)
+	await frames(1)
+	var zh: float = z.health
+	p.melee_cd = 0.0
+	p.melee()
+	check(is_equal_approx(zh - z.health, 18.0), "fists do 18 damage")
+	await clear_zombies()
+
+	# Spear reaches far but only straight ahead.
+	reset_player()
+	z = game.spawn_zombie(p.position + Vector2(100, 0), false)
+	await frames(1)
+	zh = z.health
+	p.equip("club")
+	p.melee()
+	check(z.health == zh, "club cannot reach 100 pixels")
+	p.equip("spear")
+	p.melee_cd = 0.0
+	p.melee()
+	check(z.health < zh, "spear reaches 100 pixels")
+	await clear_zombies()
+	reset_player()
+	z = game.spawn_zombie(p.position + Vector2(45, 45), false)
+	await frames(1)
+	zh = z.health
+	p.melee()
+	check(z.health == zh, "spear misses things off to the side")
+	await clear_zombies()
+
+	# Stone axe chops twice as much wood.
+	reset_player()
+	p.equip("stone_axe")
+	p.inventory.set_count("wood", 0)
+	tree = game.spawn_resource("tree", p.position + Vector2(50, 0))
+	await frames(1)
+	p.melee()
+	check(p.inventory.count("wood") >= 4, "stone axe gathers double wood")
+	tree.queue_free()
+	await frames(1)
+
+	# Bow uses arrows and is quiet.
+	reset_player()
+	p.inventory.set_count("arrow", 0)
+	check(p.equip("bow") and p.ranged_weapon == "bow", "equip the bow")
+	check(not p.shoot(), "bow cannot fire without arrows")
+	check(p.craft("arrow") and p.inventory.count("arrow") == 5, "craft 5 arrows")
+	var far_z = game.spawn_zombie(p.position + Vector2(-400, 0), false)
+	z = game.spawn_zombie(p.position + Vector2(150, 0), false)
+	await frames(1)
+	far_z.state = "wander"
+	zh = z.health
+	var pistol_ammo: int = p.ammo_reserve
+	var pistol_mag: int = p.ammo_in_mag
+	check(p.shoot(), "bow fires")
+	check(p.inventory.count("arrow") == 4 and p.ammo_reserve == pistol_ammo and p.ammo_in_mag == pistol_mag, "bow uses an arrow, not bullets")
+	check(far_z.state == "wander", "bow is quiet (far zombie did not hear it)")
+	await frames(15)
+	check(not is_instance_valid(z) or z.health < zh, "arrow hits the zombie")
+	await clear_zombies()
+
+	# Pistol is loud.
+	reset_player()
+	p.equip("pistol")
+	far_z = game.spawn_zombie(p.position + Vector2(-400, 0), false)
+	await frames(1)
+	far_z.state = "wander"
+	p.shoot()
+	check(far_z.state == "investigate", "pistol is loud (far zombie heard it)")
+	await clear_zombies()
+
+	# Losing an equipped weapon falls back safely.
+	reset_player()
+	p.equip("club")
+	p.inventory.set_count("club", 0)
+	p.melee()
+	check(p.melee_weapon == "fists", "stored/lost weapon falls back to fists")
+	check(not p.equip("crossbow"), "cannot equip a weapon you don't have")
+	p.unequip("ranged")
+	check(not p.shoot() and p.ranged_weapon == "", "no ranged weapon = no shooting")
+	p.equip("pistol")
+
+	# Character screen shows equipment.
+	game.ui.open()
+	await frames(1)
+	check(game.ui_open and game.ui._char.get_child_count() > 3, "character screen shows equipment and stats")
+	game.ui.close()
 
 	# --- death
 	reset_player()

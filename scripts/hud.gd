@@ -2,6 +2,8 @@ extends Control
 ## On-screen info: health, hunger, ammo, cooldowns, clock and messages.
 ## Everything is drawn with simple shapes and the built-in font.
 
+const Items := preload("res://scripts/items.gd")
+
 var game: Node
 var font: Font
 var _message := ""
@@ -34,12 +36,12 @@ func _draw() -> void:
 	# Left: survival stats.
 	_bar(Vector2(20, 20), "Health", p.health / p.max_health, Color(0.8, 0.2, 0.2))
 	_bar(Vector2(20, 50), "Hunger", p.hunger / 100.0, Color(0.85, 0.6, 0.2))
-	var reload_txt := "  reloading..." if p.reload_timer > 0.0 else ""
-	_text(Vector2(20, 100), "Ammo  %d / %d%s" % [p.ammo_in_mag, p.ammo_reserve, reload_txt])
 	var inv = p.inventory
-	_text(Vector2(20, 124), "Food %d   Bandages %d   Medkits %d" % [p.food, inv.count("bandage"), inv.count("medkit")])
-	_text(Vector2(20, 172), "Wood %d   Stone %d   Scrap %d   Cloth %d" % [inv.count("wood"), inv.count("stone"), inv.count("scrap"), inv.count("cloth")], 14, Color(1, 1, 1, 0.75))
-	_text(Vector2(20, 148), "Dodge %s    Shockwave %s" % [_cd(p.dodge_cd), _cd(p.shock_cd)])
+	_text(Vector2(20, 100), _ranged_line(p))
+	_text(Vector2(20, 124), "Melee: %s" % ("Fists" if p.melee_weapon == "fists" else Items.display_name(p.melee_weapon)))
+	_text(Vector2(20, 148), "Food %d   Bandages %d   Medkits %d" % [p.food, inv.count("bandage"), inv.count("medkit")])
+	_text(Vector2(20, 172), "Dodge %s    Shockwave %s" % [_cd(p.dodge_cd), _cd(p.shock_cd)])
+	_text(Vector2(20, 196), "Wood %d   Stone %d   Scrap %d   Cloth %d" % [inv.count("wood"), inv.count("stone"), inv.count("scrap"), inv.count("cloth")], 14, Color(1, 1, 1, 0.75))
 
 	# Right: clock and kills.
 	var phase := "NIGHT" if game.is_night else "Day"
@@ -66,7 +68,7 @@ func _draw() -> void:
 		_text_centered(110, _message, 24, Color(1, 1, 1, a))
 
 	# Controls reminder.
-	_text(Vector2(20, h - 16), "WASD move   LMB shoot   RMB swing / gather   Space dodge   Q shockwave   R reload   E use   F eat   H heal   Tab inventory", 14, Color(1, 1, 1, 0.55))
+	_text(Vector2(20, h - 16), "WASD move   LMB ranged   RMB melee / gather   Space dodge   Q shockwave   R reload   E use   F eat   H heal   Tab character", 14, Color(1, 1, 1, 0.55))
 
 	if game.game_over:
 		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.65))
@@ -90,6 +92,16 @@ func _text(pos: Vector2, text: String, font_size: int = 16, color: Color = Color
 func _text_centered(y: float, text: String, font_size: int = 16, color: Color = Color.WHITE) -> void:
 	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 	_text(Vector2((size.x - tw) / 2, y), text, font_size, color)
+
+
+func _ranged_line(p) -> String:
+	if p.ranged_weapon == "":
+		return "Ranged: none"
+	var name := Items.display_name(p.ranged_weapon)
+	if p.ranged_weapon == "pistol":
+		var reload_txt := "  reloading..." if p.reload_timer > 0.0 else ""
+		return "%s  %d / %d%s" % [name, p.ammo_in_mag, p.ammo_reserve, reload_txt]
+	return "%s  arrows %d" % [name, p.inventory.count("arrow")]
 
 
 func _cd(t: float) -> String:
