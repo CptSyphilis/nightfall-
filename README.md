@@ -8,6 +8,12 @@ combat like V Rising (mouse aim, melee arcs, dodge roll, cooldown ability).
 Version 0.1 - single player, survive day and night.
 
 
+Play in the browser
+-------------------
+https://cptsyphilis.github.io/nightfall-/
+(needs keyboard and mouse; the build lives on the gh-pages branch)
+
+
 How to run
 ----------
 1. Install Godot 4.3 or newer (standard version, not .NET).
