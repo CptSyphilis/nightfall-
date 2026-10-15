@@ -29,6 +29,7 @@ var world_node: Node2D    # player, zombies, bullets
 var ui: Control           # inventory / crafting window
 var placement: Node2D     # green/red outline when placing a chest or workbench
 var placing := ""         # item id being placed, "" when not placing
+var show_input_debug := false   # F3: shows what the controller is sending
 
 ## True while the inventory window is open (combat is paused for the player).
 var ui_open: bool:
@@ -79,6 +80,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("debug_input"):
+		show_input_debug = not show_input_debug
 	if game_over and event.is_action_pressed("restart"):
 		get_tree().reload_current_scene()
 
@@ -451,6 +454,7 @@ static func setup_input() -> void:
 	_action("inventory", 0.5, [_key(KEY_TAB), _key(KEY_I), _button(JOY_BUTTON_START)])
 	_action("close_ui",  0.5, [_key(KEY_ESCAPE), _button(JOY_BUTTON_B)])
 	_action("restart",   0.5, [_key(KEY_ENTER), _button(JOY_BUTTON_A)])
+	_action("debug_input", 0.5, [_key(KEY_F3)])
 	# Let the left stick move around menus too (the D-pad already does).
 	InputMap.action_add_event("ui_up", _axis(JOY_AXIS_LEFT_Y, -1.0))
 	InputMap.action_add_event("ui_down", _axis(JOY_AXIS_LEFT_Y, 1.0))

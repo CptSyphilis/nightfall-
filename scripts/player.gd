@@ -75,6 +75,8 @@ var controls_enabled := true
 var use_mouse_aim := true          # false = aim is set from code (tests)
 var using_controller := false      # true after the last input came from a gamepad
 var controller_style := "xbox"     # "xbox" or "ps", decides the button names shown
+var last_pad_device := -1          # for the F3 input checker
+var last_pad_input := "(nothing yet)"
 var game: Node
 var light: PointLight2D
 
@@ -188,6 +190,12 @@ func _update_aim(move: Vector2) -> void:
 
 ## Notice which device was used last, so aiming and button prompts follow it.
 func _input(event: InputEvent) -> void:
+	if event is InputEventJoypadButton and event.pressed:
+		last_pad_device = event.device
+		last_pad_input = "button %d pressed" % event.button_index
+	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.2:
+		last_pad_device = event.device
+		last_pad_input = "axis %d = %.2f" % [event.axis, event.axis_value]
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.3):
 		if not using_controller or controller_style == "keyboard":
 			controller_style = style_from_name(Input.get_joy_name(event.device))

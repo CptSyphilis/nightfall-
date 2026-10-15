@@ -79,6 +79,9 @@ func _draw() -> void:
 		var a := clampf(_message_time, 0.0, 1.0)
 		_text_centered(110, _message, 24, Color(1, 1, 1, a))
 
+	if game.show_input_debug:
+		_draw_input_debug(p)
+
 	# Controls reminder for whatever you are playing with.
 	_text(Vector2(20, h - 16), CONTROL_HINTS[p.prompt_style()], 14, Color(1, 1, 1, 0.55))
 
@@ -87,6 +90,27 @@ func _draw() -> void:
 		_text_centered(h / 2 - 30, "YOU DIED", 48, Color(0.9, 0.2, 0.2))
 		_text_centered(h / 2 + 15, "Survived to day %d with %d kills" % [game.day, game.kills], 20)
 		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
+
+
+## F3 input checker: shows what the controller sends, to fix button mapping problems.
+func _draw_input_debug(p) -> void:
+	var lines: Array[String] = ["INPUT CHECKER (F3 to hide)"]
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		lines.append("No controller detected")
+	for d in pads:
+		var known := "standard layout" if Input.is_joy_known(d) else "UNKNOWN layout"
+		lines.append("Pad %d: %s  (%s)" % [d, Input.get_joy_name(d), known])
+	lines.append("Last input: %s" % p.last_pad_input)
+	lines.append("R2/RT axis: %.2f   shoot pressed: %s" % [
+		Input.get_joy_axis(maxi(p.last_pad_device, 0), JOY_AXIS_TRIGGER_RIGHT),
+		"YES" if Input.is_action_pressed("shoot") else "no"])
+	lines.append("Prompts: %s" % p.prompt_style())
+	var y := 240.0
+	draw_rect(Rect2(14, y - 22, 560, 22 * lines.size() + 12), Color(0, 0, 0, 0.75))
+	for line in lines:
+		_text(Vector2(24, y), line, 15, Color(0.6, 1.0, 0.6))
+		y += 22.0
 
 
 ## Button name for an action, matching the device in use.
