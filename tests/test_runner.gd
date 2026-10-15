@@ -45,6 +45,9 @@ func reset_player() -> void:
 	p.shoot_cd = 0.0
 	p.shock_cd = 0.0
 	p.reload_timer = 0.0
+	# Most checks below need a gun, so give the test player a pistol.
+	p.inventory.set_count("pistol", 1)
+	p.ranged_weapon = "pistol"
 	p.ammo_in_mag = p.MAG_SIZE
 	p.ammo_reserve = 24
 	p.collision_mask = 1 | 4
@@ -92,6 +95,8 @@ func _run() -> void:
 	# --- world setup
 	p = game.player
 	check(p != null, "player exists")
+	check(p.ranged_weapon == "" and p.melee_weapon == "fists", "you start with only your fists")
+	check(p.inventory.is_empty(), "you start with an empty bag")
 	check(game.ruins.size() > 10, "ruins were generated (%d)" % game.ruins.size())
 	check(get_nodes_in_group("crates").size() >= 30, "crates were placed")
 	check(game.nav != null, "zombie navigation grid is built")
@@ -135,9 +140,6 @@ func _run() -> void:
 	await frames(10)
 	check(not is_instance_valid(z) or z.health < hp0, "bullet hits the zombie")
 	await clear_zombies()
-
-	# --- starting equipment
-	check(p.ranged_weapon == "pistol" and p.melee_weapon == "fists", "you start with a pistol and fists")
 
 	# --- melee kill (with a club)
 	reset_player()

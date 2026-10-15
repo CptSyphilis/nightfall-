@@ -48,12 +48,12 @@ var radius := 14.0
 var max_health := 100.0
 var health := 100.0
 var hunger := 100.0
-var ammo_in_mag := MAG_SIZE     # rounds loaded in the pistol
+var ammo_in_mag := 0            # rounds loaded in the pistol
 var inventory = InventoryScript.new()
 
 ## Equipped weapons. "fists" = no melee weapon, "" = no ranged weapon.
 var melee_weapon := "fists"
-var ranged_weapon := "pistol"
+var ranged_weapon := ""
 
 ## Spare ammo and food live in the inventory. These are shortcuts to them.
 var ammo_reserve: int:
@@ -103,10 +103,8 @@ var sprite: Sprite2D
 
 
 func _init() -> void:
-	# Starting kit.
-	inventory.add("pistol", 1)
-	inventory.add("ammo", 24)
-	inventory.add("food", 1)
+	# You start with nothing but your fists. Find or craft everything else.
+	pass
 
 
 func _ready() -> void:
