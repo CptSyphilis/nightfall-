@@ -42,7 +42,7 @@ Enter                   A               Cross           restart after dying
 
 In build mode:
 Left click (hold)       RT (hold)       R2 (hold)       build (drag to draw walls)
-Right click             Y               Triangle        demolish (half the cost back)
+Right click (hold)      Y (hold)        Triangle (hold) demolish (drag to remove a line, half the cost back)
 Wheel or 1-5            LB / RB         L1 / R1         choose piece
 
 The game switches button prompts automatically to whatever you last touched.

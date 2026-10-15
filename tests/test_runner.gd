@@ -599,6 +599,32 @@ func _run() -> void:
 	game.demolish_at(cellpos.call(3, 0))
 	await frames(2)
 
+	# Drag to demolish: hold demolish and sweep over a line of walls.
+	for i in 4:
+		game.build_piece("wood_wall", cellpos.call(-2 + i, 3))
+	var line_count := func() -> int:
+		var n := 0
+		for st in get_nodes_in_group("structures"):
+			if st.kind == "wood_wall" and absf(st.global_position.y - cellpos.call(0, 3).y) < 1.0:
+				n += 1
+		return n
+	check(line_count.call() == 4, "built a line of 4 walls to drag-remove")
+	for i in 4:
+		game.build.drag(cellpos.call(-2 + i, 3), false, true)
+		game.build.drag(cellpos.call(-2 + i, 3), false, true)   # same square twice: only once
+	await frames(2)
+	check(line_count.call() == 0, "holding demolish and moving removes the whole line")
+	game.build.drag(cellpos.call(0, 0), false, false)   # let go
+	# Drag to build still works.
+	for i in 3:
+		game.build.drag(cellpos.call(-2 + i, 3), true, false)
+	await frames(1)
+	check(line_count.call() == 3, "holding build and moving still builds a line")
+	game.build.drag(cellpos.call(0, 0), false, false)
+	for i in 3:
+		game.demolish_at(cellpos.call(-2 + i, 3))
+	await frames(2)
+
 	# Door: the player walks through, zombies don't.
 	check(game.build_piece("door", cellpos.call(0, 3)), "build a door")
 	var door = null
