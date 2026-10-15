@@ -5,6 +5,9 @@ var opened := false
 var small := false
 var loot := {}   # item id -> amount
 
+const TEX_CRATE := preload("res://assets/crate.svg")
+const TEX_BAG := preload("res://assets/bag.svg")
+
 
 func setup(rng: RandomNumberGenerator, is_small: bool) -> void:
 	small = is_small
@@ -46,8 +49,7 @@ func _draw() -> void:
 		draw_rect(rect, Color(0.25, 0.2, 0.14))
 		draw_rect(rect.grow(-3), Color(0.12, 0.1, 0.08))
 		return
-	var wood := Color(0.55, 0.4, 0.22) if not small else Color(0.35, 0.4, 0.3)
-	draw_rect(rect.grow(2), Color(0.1, 0.08, 0.05))
-	draw_rect(rect, wood)
-	draw_line(rect.position, rect.end, wood.darkened(0.35), 2.0)
-	draw_line(Vector2(rect.position.x, rect.end.y), Vector2(rect.end.x, rect.position.y), wood.darkened(0.35), 2.0)
+	var tex: Texture2D = TEX_BAG if small else TEX_CRATE
+	if not small:
+		draw_rect(Rect2(rect.position + Vector2(3, 4), rect.size), Color(0, 0, 0, 0.3))
+	draw_texture_rect(tex, rect.grow(2) if not small else Rect2(-tex.get_size() / 2, tex.get_size()), false)

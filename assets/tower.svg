@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Tower base: stone footing with a round timber platform -->
+  <rect x="0" y="0" width="32" height="32" fill="#121213"/>
+  <rect x="1.5" y="1.5" width="29" height="29" fill="#5a5a5d"/>
+  <path d="M1.5 9 H8 M24 9 H30.5 M1.5 23 H8 M24 23 H30.5 M9 1.5 V7 M23 1.5 V7 M9 25 V30.5 M23 25 V30.5" stroke="#2c2c2e" stroke-width="1"/>
+  <rect x="1.5" y="1.5" width="6" height="6" fill="#6e6e72"/><rect x="24.5" y="1.5" width="6" height="6" fill="#6e6e72"/>
+  <rect x="1.5" y="24.5" width="6" height="6" fill="#4e4e51"/><rect x="24.5" y="24.5" width="6" height="6" fill="#4e4e51"/>
+  <circle cx="16" cy="16" r="12.5" fill="#100b06"/>
+  <circle cx="16" cy="16" r="11" fill="#6a4a29"/>
+  <path d="M5.5 12 H26.5 M5 16 H27 M5.5 20 H26.5" stroke="#4e351b" stroke-width="1"/>
+  <circle cx="16" cy="16" r="11" fill="none" stroke="#8a6740" stroke-width="1"/>
+</svg>

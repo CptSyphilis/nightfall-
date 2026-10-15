@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="34" viewBox="0 0 16 34">
+  <!-- Bow held upright in front of you, bending forward (+X); string on the left -->
+  <path d="M3 2 L3 32" stroke="#d8d2c0" stroke-width="0.9"/>
+  <path d="M3 2 Q20 17 3 32" stroke="#1a120a" stroke-width="4.4" fill="none" stroke-linecap="round"/>
+  <path d="M3 2 Q20 17 3 32" stroke="#7a5430" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M5.5 5 Q15 12 11.4 17" stroke="#9a7044" stroke-width="0.8" fill="none"/>
+  <rect x="9.6" y="14.5" width="3.2" height="5" rx="0.8" fill="#3a2a1c"/>
+</svg>

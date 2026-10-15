@@ -26,6 +26,8 @@ const NavGridScript := preload("res://scripts/nav_grid.gd")
 const BuildModeScript := preload("res://scripts/build_mode.gd")
 const GridOverlayScript := preload("res://scripts/grid_overlay.gd")
 const Buildings := preload("res://scripts/buildings.gd")
+const TEX_GRASS := preload("res://assets/grass_tile.svg")
+const TEX_RUBBLE := preload("res://assets/rubble_tile.svg")
 
 const DAY_COLOR := Color(1, 1, 1)
 const NIGHT_COLOR := Color(0.28, 0.32, 0.5)
@@ -65,6 +67,7 @@ var _night_confirm_until := 0   # campfire needs a second press within 3 seconds
 var ruins: Array[Rect2] = []
 var rng := RandomNumberGenerator.new()
 var _ground_specks: Array = []
+var _road_cracks: Array = []
 
 
 func _ready() -> void:
@@ -545,6 +548,16 @@ func _build_world() -> void:
 		var s := rng.randf_range(4, 14)
 		var c := Color(0.27, 0.34, 0.2) if rng.randf() < 0.6 else Color(0.3, 0.27, 0.19)
 		_ground_specks.append([Rect2(p, Vector2(s, s * 0.6)), c])
+	# Cracks in the asphalt.
+	for i in 160:
+		var along := rng.randf() * WORLD_SIZE.x
+		var across := WORLD_SIZE.y / 2 + rng.randf_range(-60, 60)
+		var p := Vector2(along, across) if i % 2 == 0 else Vector2(across, along)
+		var line := PackedVector2Array([p])
+		for k in 3:
+			p += Vector2(rng.randf_range(-9, 9), rng.randf_range(-9, 9))
+			line.append(p)
+		_road_cracks.append(line)
 	queue_redraw()
 
 
@@ -636,16 +649,30 @@ func _spawn_crates() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.23, 0.3, 0.18))
-	# Two cracked roads crossing the map.
-	draw_rect(Rect2(0, WORLD_SIZE.y / 2 - 64, WORLD_SIZE.x, 128), Color(0.22, 0.22, 0.22))
-	draw_rect(Rect2(WORLD_SIZE.x / 2 - 64, 0, 128, WORLD_SIZE.y), Color(0.22, 0.22, 0.22))
+	draw_texture_rect(TEX_GRASS, Rect2(Vector2.ZERO, WORLD_SIZE), true)
 	for s in _ground_specks:
-		draw_rect(s[0], s[1])
+		draw_rect(s[0], Color(s[1], 0.55))
+	# Two cracked roads crossing the map.
+	var road := Color(0.2, 0.2, 0.21)
+	var h := Rect2(0, WORLD_SIZE.y / 2 - 64, WORLD_SIZE.x, 128)
+	var v := Rect2(WORLD_SIZE.x / 2 - 64, 0, 128, WORLD_SIZE.y)
+	for rr in [h, v]:
+		draw_rect(rr.grow(3), Color(0.25, 0.24, 0.2))    # gravel shoulder
+		draw_rect(rr, road)
+	var paint := Color(0.55, 0.5, 0.33, 0.6)
+	for i in int(WORLD_SIZE.x / 64.0):
+		var x := i * 64.0 + 12.0
+		if absf(x + 16.0 - WORLD_SIZE.x / 2) > 80.0:
+			draw_rect(Rect2(x, WORLD_SIZE.y / 2 - 1.5, 32, 3), paint)
+		if absf(x + 16.0 - WORLD_SIZE.y / 2) > 80.0:
+			draw_rect(Rect2(WORLD_SIZE.x / 2 - 1.5, x, 3, 32), paint)
+	for c in _road_cracks:
+		draw_polyline(c, Color(0.12, 0.12, 0.12), 1.5)
 	for r in ruins:
-		draw_rect(r.grow(6), Color(0.17, 0.16, 0.15))
-		draw_rect(r, Color(0.37, 0.34, 0.31))
-		draw_rect(r.grow(-12), Color(0.3, 0.27, 0.25))
+		draw_rect(r.grow(6), Color(0.13, 0.12, 0.11))
+		draw_texture_rect(TEX_RUBBLE, r, true)
+		draw_rect(r.grow(-1), Color(0.24, 0.22, 0.2), false, 4.0)   # broken wall tops
+		draw_rect(r.grow(-12), Color(0, 0, 0, 0.18))
 
 
 # ---------------------------------------------------------------- controls

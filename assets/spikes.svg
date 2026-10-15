@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Sharpened stakes in a dug pit -->
+  <rect x="2" y="2" width="28" height="28" rx="3" fill="#24190f" opacity="0.85"/>
+  <rect x="4" y="4" width="24" height="24" rx="2" fill="#3a2a1a" opacity="0.8"/>
+  <g stroke="#0f0b07" stroke-width="1" stroke-linejoin="round">
+    <path d="M4 10 L9 4 L11 12 Z" fill="#a08356"/>
+    <path d="M18 4 L24 3 L21 11 Z" fill="#8f744a"/>
+    <path d="M27 14 L29 21 L22 18 Z" fill="#a08356"/>
+    <path d="M12 13 L17 9 L19 18 L13 19 Z" fill="#b29464"/>
+    <path d="M4 22 L11 20 L8 28 Z" fill="#8f744a"/>
+    <path d="M16 23 L22 21 L23 28 L17 29 Z" fill="#a08356"/>
+  </g>
+  <g fill="#e2d6b8"><circle cx="9" cy="4.6" r="0.9"/><circle cx="23.5" cy="3.6" r="0.9"/><circle cx="28.5" cy="20.4" r="0.9"/><circle cx="17" cy="9.6" r="0.9"/><circle cx="4.6" cy="22" r="0.9"/><circle cx="22.4" cy="21.4" r="0.9"/></g>
+  <circle cx="12" cy="25" r="1.6" fill="#4e1a16" opacity="0.6"/>
+</svg>

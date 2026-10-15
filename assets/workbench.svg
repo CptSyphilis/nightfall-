@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="32" viewBox="0 0 64 32">
+  <rect x="0" y="0" width="64" height="32" rx="1.5" fill="#1a1209"/>
+  <rect x="2" y="2" width="60" height="28" fill="#6a4a2b"/>
+  <path d="M2 9 H62 M2 16 H62 M2 23 H62" stroke="#553a20" stroke-width="1.2"/>
+  <path d="M20 2 V9 M44 9 V16 M14 16 V23 M38 23 V30 M52 2 V9" stroke="#4e341c" stroke-width="0.9"/>
+  <rect x="2" y="2" width="60" height="3" fill="#7d5a36"/>
+  <!-- vise -->
+  <rect x="4" y="3" width="13" height="9" rx="1" fill="#3b3e42" stroke="#121314" stroke-width="1"/>
+  <rect x="6" y="5" width="9" height="2.4" fill="#6d7175"/>
+  <path d="M10 12 V16" stroke="#121314" stroke-width="1.6"/>
+  <!-- saw -->
+  <path d="M22 6 L40 9 L40 14 L23 11 Z" fill="#8a8e92" stroke="#151617" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M23 11 l1.5 1 l1.5 -0.7 l1.5 1 l1.5 -0.7 l1.5 1 l1.5 -0.7 l1.5 1 l1.5 -0.7 l1.5 1 l1.5 -0.7 l1.5 1" stroke="#151617" stroke-width="0.7" fill="none"/>
+  <rect x="40" y="7.5" width="6" height="7" rx="1.5" fill="#4a2e1a" stroke="#151617" stroke-width="1"/>
+  <!-- hammer -->
+  <path d="M30 26 L45 19" stroke="#1a1209" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M30 26 L45 19" stroke="#8a6440" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="43" y="15" width="5" height="9" rx="1" transform="rotate(-25 45.5 19.5)" fill="#45484c" stroke="#121314" stroke-width="1"/>
+  <!-- nails and scraps -->
+  <rect x="50" y="20" width="9" height="6" fill="#5c4026" stroke="#2a1c10" stroke-width="0.8" transform="rotate(10 54 23)"/>
+  <path d="M8 22 l3 1 M9 26 l3 -1 M14 25 l2 2" stroke="#a5a8ab" stroke-width="1"/>
+</svg>

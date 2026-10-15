@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <rect x="0" y="0" width="32" height="32" fill="#1a1209"/>
+  <rect x="1.5" y="1.5" width="29" height="6.5" fill="#6f4d2a"/>
+  <rect x="1.5" y="9" width="29" height="6.5" fill="#614322"/>
+  <rect x="1.5" y="16.5" width="29" height="6.5" fill="#6a4927"/>
+  <rect x="1.5" y="24" width="29" height="6.5" fill="#5c3f20"/>
+  <path d="M1.5 3 H30.5 M1.5 10.5 H30.5 M1.5 18 H30.5 M1.5 25.5 H30.5" stroke="#86613a" stroke-width="0.8"/>
+  <path d="M8 5 q3 1.2 6 0 M18 12 q4 1.2 8 0 M5 20 q4 1 7 0 M17 27 q3 1.2 7 0" stroke="#4a3219" stroke-width="0.7" fill="none"/>
+  <rect x="6" y="1.5" width="3.5" height="29" fill="#4e351b"/>
+  <rect x="22.5" y="1.5" width="3.5" height="29" fill="#4e351b"/>
+  <g fill="#9a9a9e"><circle cx="7.75" cy="4.7" r="0.9"/><circle cx="24.25" cy="4.7" r="0.9"/><circle cx="7.75" cy="12.2" r="0.9"/><circle cx="24.25" cy="12.2" r="0.9"/><circle cx="7.75" cy="19.7" r="0.9"/><circle cx="24.25" cy="19.7" r="0.9"/><circle cx="7.75" cy="27.2" r="0.9"/><circle cx="24.25" cy="27.2" r="0.9"/></g>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Door frame with a plank door seen from above -->
+  <rect x="0" y="0" width="32" height="32" fill="#1a1209"/>
+  <rect x="1.5" y="1.5" width="29" height="29" fill="#3d2914"/>
+  <rect x="5" y="4" width="22" height="24" fill="#16100a"/>
+  <rect x="6" y="5" width="6.6" height="22" fill="#86602f"/>
+  <rect x="12.7" y="5" width="6.6" height="22" fill="#7a5629"/>
+  <rect x="19.4" y="5" width="6.6" height="22" fill="#835c2d"/>
+  <rect x="6" y="8" width="20" height="3" fill="#52565a"/>
+  <rect x="6" y="21" width="20" height="3" fill="#52565a"/>
+  <path d="M6 8.5 H26 M6 21.5 H26" stroke="#7d8185" stroke-width="0.7"/>
+  <circle cx="22.5" cy="16" r="2.2" fill="#14110a"/>
+  <circle cx="22.5" cy="16" r="1.5" fill="#b8963e"/>
+</svg>

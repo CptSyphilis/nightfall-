@@ -13,6 +13,19 @@ const InventoryScript := preload("res://scripts/inventory.gd")
 const Buildings := preload("res://scripts/buildings.gd")
 const BulletScript := preload("res://scripts/bullet.gd")
 
+## Sprites, each the exact size of its grid footprint.
+const TEXTURES := {
+	"chest": preload("res://assets/chest.svg"),
+	"workbench": preload("res://assets/workbench.svg"),
+	"campfire": preload("res://assets/campfire.svg"),
+	"wood_wall": preload("res://assets/wood_wall.svg"),
+	"stone_wall": preload("res://assets/stone_wall.svg"),
+	"door": preload("res://assets/door.svg"),
+	"spikes": preload("res://assets/spikes.svg"),
+	"tower": preload("res://assets/tower.svg"),
+}
+const TEX_TOWER_BOW := preload("res://assets/tower_bow.svg")
+
 const LAYER_DOOR := 16   # only zombies bump into doors; the player walks through
 
 const SIZES := {
@@ -206,75 +219,24 @@ func _draw() -> void:
 ## Draws a structure onto any canvas item (also used for the build mode preview).
 static func draw_piece(ci: CanvasItem, k: String, sz: Vector2, t: float = 0.0, aim: float = -PI / 2) -> void:
 	var r := Rect2(-sz / 2, sz)
-	var outline := Color(0.1, 0.07, 0.04)
+	# Soft drop shadow under the things that stand up off the ground.
+	if k in ["chest", "workbench", "tower"]:
+		ci.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.3))
+	if TEXTURES.has(k):
+		ci.draw_texture_rect(TEXTURES[k], r, false)
+	else:
+		ci.draw_rect(r, Color(0.5, 0.33, 0.18))
 	match k:
 		"campfire":
-			for i in 9:
-				var p := Vector2.from_angle(TAU * i / 9.0) * 14.0
-				ci.draw_circle(p, 5.0, Color(0.1, 0.1, 0.1))
-				ci.draw_circle(p, 4.0, Color(0.5, 0.5, 0.52))
-			ci.draw_line(Vector2(-9, -6), Vector2(9, 6), Color(0.35, 0.22, 0.12), 5.0)
-			ci.draw_line(Vector2(-9, 6), Vector2(9, -6), Color(0.3, 0.19, 0.1), 5.0)
+			# Procedural flame on top of the logs, so it keeps flickering.
 			var f := sin(t * 8.0) * 1.5
-			ci.draw_circle(Vector2(0, -1), 7.0 + f, Color(0.95, 0.4, 0.1, 0.9))
-			ci.draw_circle(Vector2(1, -3), 4.5 - f * 0.5, Color(1.0, 0.75, 0.2, 0.95))
-			ci.draw_circle(Vector2(0, -4), 2.0, Color(1.0, 0.95, 0.7))
-		"chest":
-			ci.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.3))
-			ci.draw_rect(r.grow(2), outline)
-			ci.draw_rect(r, Color(0.5, 0.33, 0.18))
-			ci.draw_rect(Rect2(r.position.x, -3, r.size.x, 6), Color(0.35, 0.35, 0.38))
-			ci.draw_rect(Rect2(-4, -5, 8, 10), Color(0.85, 0.7, 0.3))
-		"workbench":
-			ci.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.3))
-			ci.draw_rect(r.grow(2), outline)
-			ci.draw_rect(r, Color(0.42, 0.3, 0.18))
-			for i in 4:
-				var x := r.position.x + 6 + i * (r.size.x - 12) / 3.0
-				ci.draw_line(Vector2(x, r.position.y + 2), Vector2(x, r.end.y - 2), Color(0.32, 0.22, 0.12), 2.0)
-			ci.draw_rect(Rect2(-24, -12, 20, 6), Color(0.7, 0.7, 0.72))
-			ci.draw_line(Vector2(6, 8), Vector2(22, -8), Color(0.3, 0.2, 0.1), 3.0)
-			ci.draw_rect(Rect2(18, -12, 10, 6), Color(0.4, 0.4, 0.42))
-		"wood_wall":
-			ci.draw_rect(r, outline)
-			var inner := r.grow(-2)
-			ci.draw_rect(inner, Color(0.52, 0.36, 0.2))
-			for i in range(1, 4):
-				var y := inner.position.y + inner.size.y * i / 4.0
-				ci.draw_line(Vector2(inner.position.x, y), Vector2(inner.end.x, y), Color(0.36, 0.24, 0.13), 2.0)
-			for p in [Vector2(-9, -9), Vector2(9, -9), Vector2(-9, 9), Vector2(9, 9)]:
-				ci.draw_circle(p, 1.5, Color(0.25, 0.25, 0.27))
-		"stone_wall":
-			ci.draw_rect(r, Color(0.12, 0.12, 0.13))
-			var inner := r.grow(-2)
-			ci.draw_rect(inner, Color(0.5, 0.5, 0.53))
-			var mortar := Color(0.32, 0.32, 0.34)
-			for row in 3:
-				var y := inner.position.y + inner.size.y * row / 3.0
-				ci.draw_line(Vector2(inner.position.x, y), Vector2(inner.end.x, y), mortar, 2.0)
-				var shift := 7.0 if row % 2 == 0 else 0.0
-				for x in [inner.position.x + 7.0 + shift, inner.position.x + 21.0 + shift]:
-					if x < inner.end.x - 2:
-						ci.draw_line(Vector2(x, y), Vector2(x, y + inner.size.y / 3.0), mortar, 2.0)
-		"door":
-			ci.draw_rect(r, outline)
-			ci.draw_rect(r.grow(-2), Color(0.3, 0.2, 0.11))
-			ci.draw_rect(r.grow(-6), Color(0.6, 0.42, 0.22))
-			ci.draw_line(Vector2(0, r.position.y + 6), Vector2(0, r.end.y - 6), Color(0.4, 0.27, 0.14), 2.0)
-			ci.draw_circle(Vector2(7, 0), 2.5, Color(0.85, 0.75, 0.35))
-		"spikes":
-			ci.draw_rect(r.grow(-2), Color(0.15, 0.12, 0.08, 0.6))
-			for p in [Vector2(-8, -8), Vector2(8, -8), Vector2(-8, 8), Vector2(8, 8), Vector2(0, 0)]:
-				var tri := PackedVector2Array([p + Vector2(-4, 4), p + Vector2(4, 4), p + Vector2(0, -6)])
-				ci.draw_colored_polygon(tri, Color(0.75, 0.75, 0.78))
-				ci.draw_polyline(PackedVector2Array([tri[0], tri[1], tri[2], tri[0]]), Color(0.2, 0.2, 0.22), 1.0)
+			var g := sin(t * 13.0 + 1.0) * 1.0
+			ci.draw_circle(Vector2(0, 0), 8.0 + f, Color(0.85, 0.3, 0.08, 0.55))
+			ci.draw_circle(Vector2(0, -1), 6.5 + f, Color(0.95, 0.42, 0.1, 0.9))
+			ci.draw_circle(Vector2(1 + g * 0.5, -3), 4.5 - f * 0.5, Color(1.0, 0.72, 0.2, 0.95))
+			ci.draw_circle(Vector2(0, -4 + g * 0.5), 2.0, Color(1.0, 0.95, 0.7))
 		"tower":
-			ci.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.3))
-			ci.draw_rect(r, Color(0.12, 0.12, 0.13))
-			ci.draw_rect(r.grow(-2), Color(0.45, 0.45, 0.48))
-			ci.draw_circle(Vector2.ZERO, 12.0, Color(0.1, 0.07, 0.04))
-			ci.draw_circle(Vector2.ZERO, 10.5, Color(0.5, 0.34, 0.18))
-			# A mounted bow pointing at the last target.
-			var c := Vector2.from_angle(aim) * 4.0
-			ci.draw_arc(c, 9.0, aim - 1.3, aim + 1.3, 10, Color(0.3, 0.2, 0.1), 3.0)
-			ci.draw_line(Vector2.ZERO, Vector2.from_angle(aim) * 13.0, Color(0.85, 0.8, 0.7), 2.0)
+			# The mounted bow turns to point at the last target.
+			ci.draw_set_transform(Vector2.ZERO, aim)
+			ci.draw_texture(TEX_TOWER_BOW, -TEX_TOWER_BOW.get_size() / 2)
+			ci.draw_set_transform(Vector2.ZERO)

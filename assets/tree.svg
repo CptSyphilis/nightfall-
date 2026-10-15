@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <!-- Canopy from above, about 34 px radius, centre (40,40) -->
+  <circle cx="45" cy="47" r="34" fill="#000" opacity="0.28"/>
+  <path d="M40 5 Q55 4 63 13 Q75 18 74 33 Q79 45 71 55 Q69 70 54 73 Q42 79 30 73 Q14 72 10 58 Q2 47 7 34 Q7 18 20 12 Q28 4 40 5 Z" fill="#17240f" stroke="#0a1207" stroke-width="2"/>
+  <circle cx="28" cy="27" r="15" fill="#2a3d1c"/>
+  <circle cx="52" cy="24" r="14" fill="#2f4420"/>
+  <circle cx="58" cy="47" r="15" fill="#283b1a"/>
+  <circle cx="36" cy="55" r="16" fill="#2c4120"/>
+  <circle cx="20" cy="45" r="11" fill="#263818"/>
+  <circle cx="42" cy="38" r="13" fill="#34492a"/>
+  <circle cx="25" cy="23" r="7" fill="#3a5226"/>
+  <circle cx="48" cy="19" r="6" fill="#405a2a"/>
+  <circle cx="38" cy="33" r="6" fill="#405a2a"/>
+  <circle cx="54" cy="42" r="6" fill="#3a5226"/>
+  <circle cx="31" cy="50" r="6" fill="#3a5226"/>
+  <path d="M22 32 L30 40 M60 30 L50 38 M44 62 L42 50" stroke="#1d2c13" stroke-width="1.4"/>
+</svg>

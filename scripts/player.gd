@@ -31,6 +31,19 @@ const BulletScript := preload("res://scripts/bullet.gd")
 const InventoryScript := preload("res://scripts/inventory.gd")
 const Items := preload("res://scripts/items.gd")
 
+# Sprites. Everything faces right (+X) and is rotated to aim_dir.
+const TEX_BODY := preload("res://assets/player.svg")
+const WEAPON_TEX := {
+	"pistol": preload("res://assets/pistol.svg"),
+	"bow": preload("res://assets/bow.svg"),
+	"crossbow": preload("res://assets/crossbow.svg"),
+	"club": preload("res://assets/club.svg"),
+	"stone_axe": preload("res://assets/stone_axe.svg"),
+	"spear": preload("res://assets/spear.svg"),
+	"spiked_club": preload("res://assets/spiked_club.svg"),
+	"machete": preload("res://assets/machete.svg"),
+}
+
 var radius := 14.0
 var max_health := 100.0
 var health := 100.0
@@ -86,6 +99,7 @@ const JS_READ_R2 := "(function(){var g=navigator.getGamepads?navigator.getGamepa
 var last_pad_input := "(nothing yet)"
 var game: Node
 var light: PointLight2D
+var sprite: Sprite2D
 
 
 func _init() -> void:
@@ -105,6 +119,12 @@ func _ready() -> void:
 	circle.radius = radius
 	shape.shape = circle
 	add_child(shape)
+
+	# The body sprite. Only it rotates; health, rings and markers stay upright in _draw.
+	sprite = Sprite2D.new()
+	sprite.texture = TEX_BODY
+	sprite.show_behind_parent = true
+	add_child(sprite)
 
 	game = get_tree().get_first_node_in_group("game")
 	var cam := Camera2D.new()
@@ -603,15 +623,19 @@ func take_damage(amount: float, flash: bool = true) -> void:
 # ---------------------------------------------------------------- drawing
 
 func _draw() -> void:
-	var body := Color(0.3, 0.55, 0.85)
+	var tint := Color(1, 1, 1)
 	if hurt_flash > 0.0:
-		body = Color(1, 0.4, 0.4)
+		tint = Color(1.6, 0.55, 0.5)
 	if dead:
-		body = Color(0.3, 0.3, 0.3)
+		tint = Color(0.45, 0.45, 0.45)
+	if sprite != null:
+		sprite.rotation = aim_dir.angle()
+		sprite.modulate = tint
 	if dodge_timer > 0.0:
-		draw_circle(-dodge_dir * 16.0, radius, Color(body, 0.3))
-	draw_circle(Vector2.ZERO, radius + 2.0, Color(0.08, 0.08, 0.1))
-	draw_circle(Vector2.ZERO, radius, body)
+		# A faded copy trailing behind the roll.
+		draw_set_transform(-dodge_dir * 16.0, aim_dir.angle())
+		draw_texture(TEX_BODY, -TEX_BODY.get_size() / 2, Color(tint, 0.3))
+		draw_set_transform(Vector2.ZERO)
 	if swing_flash > 0.0:
 		_draw_swing()
 	else:
@@ -622,29 +646,24 @@ func _draw() -> void:
 		draw_arc(mark, 7.0, 0.0, TAU, 16, Color(1, 1, 1, 0.55), 2.0)
 		draw_circle(mark, 2.0, Color(1, 1, 1, 0.7))
 	if muzzle_flash > 0.0:
-		draw_circle(aim_dir * (radius + 16.0), 6.0, Color(1, 0.85, 0.4))
+		var m := aim_dir * (radius + 16.0)
+		draw_circle(m, 6.0, Color(1, 0.6, 0.2, 0.8))
+		draw_circle(m, 3.5, Color(1, 0.92, 0.6))
 	if shock_flash > 0.0:
 		var k := shock_flash / 0.3
 		draw_arc(Vector2.ZERO, SHOCK_RADIUS * (1.0 - k), 0.0, TAU, 40, Color(0.6, 0.8, 1.0, k), 6.0)
 
 
-## The ranged weapon held in front of you.
+## The ranged weapon held in front of you (grip at your hands, about 10 px forward).
 func _draw_ranged_weapon() -> void:
-	var dark := Color(0.12, 0.12, 0.12)
-	var wood := Color(0.5, 0.33, 0.18)
-	var side := aim_dir.orthogonal()
-	match ranged_weapon:
-		"pistol":
-			draw_line(aim_dir * 6.0, aim_dir * (radius + 12.0), dark, 5.0)
-		"bow":
-			var c := aim_dir * 12.0
-			var a := aim_dir.angle()
-			draw_arc(c, 14.0, a - 1.3, a + 1.3, 12, wood, 3.0)
-			draw_line(c + Vector2.from_angle(a - 1.3) * 14.0, c + Vector2.from_angle(a + 1.3) * 14.0, Color(0.9, 0.9, 0.85), 1.0)
-		"crossbow":
-			draw_line(aim_dir * 4.0, aim_dir * (radius + 14.0), wood, 5.0)
-			var tip := aim_dir * (radius + 8.0)
-			draw_line(tip - side * 11.0, tip + side * 11.0, dark, 3.0)
+	if not WEAPON_TEX.has(ranged_weapon):
+		return
+	var tex: Texture2D = WEAPON_TEX[ranged_weapon]
+	var at := {"pistol": Vector2(8, 0), "bow": Vector2(8, 0), "crossbow": Vector2(2, 0)}
+	var p: Vector2 = at.get(ranged_weapon, Vector2(8, 0))
+	draw_set_transform(Vector2.ZERO, aim_dir.angle())
+	draw_texture(tex, p - Vector2(0, tex.get_height() / 2.0))
+	draw_set_transform(Vector2.ZERO)
 
 
 ## The melee weapon sweeping through its arc during a swing.
@@ -655,29 +674,25 @@ func _draw_swing() -> void:
 	var a := aim_dir.angle()
 	var t := 1.0 - swing_flash / 0.15        # 0 -> 1 over the swing
 	if melee_weapon == "spear":
-		# A straight thrust forward.
-		var tip := aim_dir * lerpf(radius, reach, sin(t * PI))
-		draw_line(aim_dir * 4.0, tip, Color(0.5, 0.35, 0.2), 4.0)
-		draw_line(tip, tip + aim_dir * 10.0, Color(0.75, 0.75, 0.78), 5.0)
+		# A straight thrust forward. The spear tip ends 10 px past the thrust point.
+		var tip_d := lerpf(radius, reach, sin(t * PI)) + 10.0
+		var tex: Texture2D = WEAPON_TEX["spear"]
+		draw_set_transform(Vector2.ZERO, a)
+		draw_texture(tex, Vector2(tip_d - tex.get_width(), -tex.get_height() / 2.0))
+		draw_set_transform(Vector2.ZERO)
 		return
 	draw_arc(Vector2.ZERO, reach * 0.8, a - arc, a + arc, 16, Color(1, 1, 1, 0.35), 3.0)
-	var dir := Vector2.from_angle(a - arc + 2.0 * arc * t)
-	var color := Color(0.5, 0.35, 0.2)
-	var width := 6.0
-	match melee_weapon:
-		"fists":
-			draw_circle(dir * (radius + 6.0), 6.0, Color(0.85, 0.7, 0.55))
-			return
-		"machete":
-			color = Color(0.8, 0.8, 0.85)
-			width = 4.0
-		"spiked_club":
-			width = 8.0
-	draw_line(dir * 8.0, dir * reach * 0.85, color, width)
-	var head := dir * reach * 0.85
-	if melee_weapon == "stone_axe":
-		draw_line(head - dir.orthogonal() * 8.0, head + dir.orthogonal() * 4.0, Color(0.55, 0.55, 0.58), 7.0)
-	elif melee_weapon == "spiked_club":
-		for k in 3:
-			var s := head - dir * (k * 8.0)
-			draw_line(s - dir.orthogonal() * 7.0, s + dir.orthogonal() * 7.0, Color(0.7, 0.7, 0.72), 2.0)
+	var ang := a - arc + 2.0 * arc * t
+	var dir := Vector2.from_angle(ang)
+	if melee_weapon == "fists" or not WEAPON_TEX.has(melee_weapon):
+		var fist := dir * (radius + 6.0)
+		draw_circle(fist, 6.5, Color(0.08, 0.08, 0.1))
+		draw_circle(fist, 5.0, Color(0.71, 0.55, 0.42))
+		return
+	# The weapon runs from the hands out to the end of its reach.
+	var tex: Texture2D = WEAPON_TEX[melee_weapon]
+	var length := reach * 0.85 + 4.0
+	var h := tex.get_height() * length / tex.get_width()
+	draw_set_transform(Vector2.ZERO, ang)
+	draw_texture_rect(tex, Rect2(6.0, -h / 2.0, length - 6.0, h), false)
+	draw_set_transform(Vector2.ZERO)

@@ -36,9 +36,12 @@ func _physics_process(delta: float) -> void:
 func _draw() -> void:
 	if style == "arrow":
 		var back := -direction * 22.0
-		draw_line(Vector2.ZERO, back, Color(0.6, 0.45, 0.25), 2.0)
-		draw_line(Vector2.ZERO, -direction * 5.0, Color(0.8, 0.8, 0.85), 3.0)          # tip
-		draw_line(back, back + (-direction).rotated(0.5) * 6.0, Color(0.9, 0.9, 0.9), 2.0)   # feathers
-		draw_line(back, back + (-direction).rotated(-0.5) * 6.0, Color(0.9, 0.9, 0.9), 2.0)
+		var side := direction.orthogonal()
+		draw_line(Vector2.ZERO, back, Color(0.1, 0.07, 0.04), 3.5)
+		draw_line(Vector2.ZERO, back, Color(0.66, 0.5, 0.3), 1.8)
+		draw_colored_polygon(PackedVector2Array([direction * 3.0, -direction * 4.0 + side * 2.5, -direction * 4.0 - side * 2.5]), Color(0.72, 0.73, 0.76))   # tip
+		draw_line(back, back - direction * 2.0 + side * 4.0, Color(0.78, 0.74, 0.66), 2.0)   # feathers
+		draw_line(back, back - direction * 2.0 - side * 4.0, Color(0.78, 0.74, 0.66), 2.0)
 	else:
-		draw_line(Vector2.ZERO, -direction * 14.0, Color(1, 0.9, 0.5), 2.0)
+		draw_line(Vector2.ZERO, -direction * 16.0, Color(1, 0.7, 0.3, 0.45), 3.5)   # glow trail
+		draw_line(Vector2.ZERO, -direction * 12.0, Color(1, 0.92, 0.6), 1.6)

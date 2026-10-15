@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52">
+  <!-- Boulder, about 20-24 px radius, centre (26,26) -->
+  <path d="M29 9 L40 12 L48 24 L46 37 L35 47 L21 48 L9 41 L4 28 L9 14 L19 7 Z" fill="#000" opacity="0.25" transform="translate(2,3)"/>
+  <path d="M27 3 L40 8 L48 21 L47 35 L37 46 L22 48 L9 41 L4 27 L8 13 L17 5 Z" fill="#5c5d5f" stroke="#18191a" stroke-width="2.4" stroke-linejoin="round"/>
+  <path d="M17 5 L27 3 L40 8 L35 18 L22 20 L11 15 Z" fill="#7a7b7e"/>
+  <path d="M8 13 L11 15 L22 20 L19 32 L9 35 L4 27 Z" fill="#6a6b6d"/>
+  <path d="M22 20 L35 18 L48 21 L47 35 L33 33 L19 32 Z" fill="#545557"/>
+  <path d="M19 32 L33 33 L37 46 L22 48 L9 41 L9 35 Z" fill="#48494b"/>
+  <path d="M22 20 L19 32 M35 18 L33 33 M11 15 L22 20 L35 18" stroke="#2c2d2f" stroke-width="1.1" fill="none"/>
+  <path d="M19 8 L26 6 L33 9" stroke="#9a9b9e" stroke-width="1.4" fill="none"/>
+  <circle cx="38" cy="38" r="2.5" fill="#4d5a3a" opacity="0.8"/><circle cx="14" cy="38" r="1.8" fill="#4d5a3a" opacity="0.7"/>
+</svg>

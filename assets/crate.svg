@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" viewBox="0 0 40 32">
+  <!-- Wooden supply crate, 36x29 body inside a 2px outline -->
+  <rect x="0" y="0" width="40" height="32" rx="1.5" fill="#17110a"/>
+  <rect x="2" y="2" width="36" height="28" fill="#7a5a34"/>
+  <path d="M2 9 H38 M2 16 H38 M2 23 H38" stroke="#5c4226" stroke-width="1.2"/>
+  <rect x="2" y="2" width="5" height="28" fill="#5e4428"/>
+  <rect x="33" y="2" width="5" height="28" fill="#5e4428"/>
+  <path d="M7 4 L33 28" stroke="#5e4428" stroke-width="4.5"/>
+  <path d="M7 4 L33 28" stroke="#6b4e2e" stroke-width="2"/>
+  <circle cx="4.5" cy="4.5" r="1" fill="#2e2e30"/><circle cx="35.5" cy="4.5" r="1" fill="#2e2e30"/>
+  <circle cx="4.5" cy="27.5" r="1" fill="#2e2e30"/><circle cx="35.5" cy="27.5" r="1" fill="#2e2e30"/>
+  <rect x="14" y="10" width="12" height="5" fill="#2e3a2a" opacity="0.6"/>
+</svg>

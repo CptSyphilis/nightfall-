@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <!-- Survivor seen from above, facing right (+X). Body centre at (20,20). -->
+  <ellipse cx="21" cy="22" rx="11" ry="15" fill="#000" opacity="0.22"/>
+  <!-- arms reaching forward to hold a weapon -->
+  <path d="M19 8 L30 17 M19 32 L30 23" stroke="#14161a" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <path d="M19 8 L30 17 M19 32 L30 23" stroke="#3d566a" stroke-width="4.4" stroke-linecap="round" fill="none"/>
+  <circle cx="31" cy="17.5" r="2.9" fill="#14161a"/><circle cx="31" cy="22.5" r="2.9" fill="#14161a"/>
+  <circle cx="31" cy="17.5" r="2" fill="#b68c6c"/><circle cx="31" cy="22.5" r="2" fill="#b68c6c"/>
+  <!-- torso / shoulders -->
+  <ellipse cx="19" cy="20" rx="8.5" ry="14" fill="#3d566a" stroke="#14161a" stroke-width="1.6"/>
+  <path d="M15 8.5 Q13 20 15 31.5" stroke="#2c4152" stroke-width="1.4" fill="none"/>
+  <!-- backpack -->
+  <rect x="4.5" y="11.5" width="10" height="17" rx="3" fill="#5e4a30" stroke="#14161a" stroke-width="1.6"/>
+  <rect x="6.5" y="14" width="5" height="12" rx="1.5" fill="#6f5838"/>
+  <path d="M9 11.5 V28.5" stroke="#3e301e" stroke-width="1"/>
+  <rect x="3.5" y="17" width="2.5" height="6" rx="1" fill="#4a3a25" stroke="#14161a" stroke-width="0.8"/>
+  <!-- straps -->
+  <path d="M14 13 L19 11 M14 27 L19 29" stroke="#2e2416" stroke-width="1.6"/>
+  <!-- head: face edge in front, wool cap on top -->
+  <circle cx="21.5" cy="20" r="6.6" fill="#14161a"/>
+  <circle cx="21.5" cy="20" r="5.6" fill="#b68c6c"/>
+  <circle cx="20.4" cy="20" r="5.4" fill="#8a4a2e"/>
+  <path d="M17 16.5 Q15.6 20 17 23.5" stroke="#6b3620" stroke-width="1.2" fill="none"/>
+  <circle cx="19.6" cy="20" r="1.4" fill="#6b3620"/>
+</svg>

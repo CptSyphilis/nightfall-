@@ -24,6 +24,14 @@ const SIGHT_CHECK_TIME := 0.2    # how often it looks for you
 const LINE_CHECK_TIME := 0.15    # how often it checks if the way ahead is clear
 const STUCK_CHECK_TIME := 0.8
 
+# Sprites face right (+X); the sprite turns to the walking direction.
+const TEX_WALKERS := [
+	preload("res://assets/zombie_1.svg"),
+	preload("res://assets/zombie_2.svg"),
+	preload("res://assets/zombie_3.svg"),
+]
+const TEX_HORDE := preload("res://assets/zombie_horde.svg")
+
 var radius := 13.0
 var max_health := 80.0
 var health := 80.0
@@ -46,6 +54,8 @@ var game: Node
 var player: Node2D
 var _rng := RandomNumberGenerator.new()
 var _color := Color(0.45, 0.55, 0.38)
+var sprite: Sprite2D
+var _facing := Vector2.DOWN
 
 # Seeing the player
 var _sight_timer := 0.0
@@ -100,6 +110,15 @@ func _ready() -> void:
 	if is_horde:
 		_color = _color.darkened(0.25)
 		state = "chase"
+	sprite = Sprite2D.new()
+	sprite.texture = TEX_HORDE if is_horde else TEX_WALKERS[_rng.randi_range(0, TEX_WALKERS.size() - 1)]
+	sprite.offset = Vector2(2, 0)    # the sprite's body centre sits 2 px left of the texture centre
+	sprite.show_behind_parent = true
+	# A little variety in skin and cloth tone.
+	var shade := _rng.randf_range(0.88, 1.05)
+	sprite.self_modulate = Color(shade, shade, shade)
+	sprite.rotation = _facing.angle()
+	add_child(sprite)
 
 
 func _physics_process(delta: float) -> void:
@@ -341,17 +360,12 @@ func die() -> void:
 
 
 func _draw() -> void:
-	var c := Color(1, 1, 1) if hurt_flash > 0.0 else _color
-	var facing := velocity.normalized() if velocity.length() > 5.0 else Vector2.DOWN
-	var side := facing.orthogonal()
-	# Arms reaching forward.
-	for s in [side, -side]:
-		var a: Vector2 = s * 9.0
-		var b: Vector2 = s * 7.0 + facing * 22.0
-		draw_line(a, b, Color(0.08, 0.1, 0.06), 7.0)
-		draw_line(a, b, c.lightened(0.1), 4.0)
-	draw_circle(Vector2.ZERO, radius + 2.0, Color(0.08, 0.1, 0.06))
-	draw_circle(Vector2.ZERO, radius, c)
+	if velocity.length() > 5.0:
+		# Turn smoothly, so knockback and sidesteps don't make the sprite twitch.
+		_facing = _facing.slerp(velocity.normalized(), 0.25).normalized()
+	if sprite != null:
+		sprite.rotation = _facing.angle()
+		sprite.modulate = Color(2.2, 2.2, 2.2) if hurt_flash > 0.0 else Color(1, 1, 1)
 	if health < max_health:
 		var w := 26.0
 		draw_rect(Rect2(-w / 2, -radius - 10, w, 4), Color(0.1, 0.1, 0.1))
