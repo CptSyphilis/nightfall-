@@ -37,7 +37,13 @@ F                       D-pad up        D-pad up        eat
 H                       D-pad down      D-pad down      heal (bandage, then medkit)
 Tab or I                Menu            Options         character screen
 Esc                     B               Circle          close menu / cancel placing
+B                       D-pad right     D-pad right     build mode on / off
 Enter                   A               Cross           restart after dying
+
+In build mode:
+Left click (hold)       RT (hold)       R2 (hold)       build (drag to draw walls)
+Right click             Y               Triangle        demolish (half the cost back)
+Wheel or 1-5            LB / RB         L1 / R1         choose piece
 
 The game switches button prompts automatically to whatever you last touched.
 
@@ -50,12 +56,26 @@ Ranged: Pistol (loud, attracts zombies), Bow and Crossbow (quiet, use arrows)
 Craft them in the character screen, then select one to equip it.
 
 
+Building (Maul-style mazes)
+---------------------------
+Press B to build. Pieces snap to a grid and are paid from your inventory:
+  Wood wall     2 wood                     cheap, good for mazes
+  Stone wall    2 stone, 1 wood            tough
+  Door          4 wood, 1 scrap            you walk through, zombies don't
+  Spike trap    3 wood, 1 stone            hurts and slows zombies walking over it
+  Arrow tower   10 wood, 6 stone, 3 scrap  shoots zombies by itself
+Zombies always take the open route, so a long maze buys time for your towers.
+If there is no route at all (you walled yourself in), they walk up to your
+walls and smash through.
+
+
 How it plays
 ------------
-Day (90s):   gather wood, stone and scrap, search crates, craft and build.
-             Zombies wander slowly.
-Night (60s): it gets dark, zombies see further, and a horde spawns and hunts you.
-Each new day the zombies get tougher and the horde gets bigger.
+Day:   no zombies and no timer. Gather wood, stone and scrap, search crates,
+       craft, and build your base. Use the campfire (press twice) when ready.
+Night: it gets dark and the horde hunts you. 60 seconds on night 1,
+       10 seconds longer each night (max 2 minutes).
+Dawn:  the zombies are gone and a new day starts. They get tougher every night.
 Hunger drains over time. At 0 you lose health. Keep it above 60 to slowly heal.
 
 

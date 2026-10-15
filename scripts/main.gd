@@ -22,6 +22,8 @@ const InventoryUiScript := preload("res://scripts/inventory_ui.gd")
 const PlacementScript := preload("res://scripts/placement.gd")
 const FloatingTextScript := preload("res://scripts/floating_text.gd")
 const NavGridScript := preload("res://scripts/nav_grid.gd")
+const BuildModeScript := preload("res://scripts/build_mode.gd")
+const Buildings := preload("res://scripts/buildings.gd")
 
 const DAY_COLOR := Color(1, 1, 1)
 const NIGHT_COLOR := Color(0.28, 0.32, 0.5)
@@ -34,6 +36,7 @@ var world_node: Node2D    # player, zombies, bullets
 var ui: Control           # inventory / crafting window
 var placement: Node2D     # green/red outline when placing a chest or workbench
 var placing := ""         # item id being placed, "" when not placing
+var build: Node2D         # build mode (walls, doors, traps, towers)
 var show_input_debug := false   # F3: shows what the controller is sending
 
 ## True while the inventory window is open (combat is paused for the player).
@@ -184,10 +187,12 @@ func spawn_zombie(pos: Vector2, horde: bool) -> CharacterBody2D:
 	return z
 
 
-func spawn_crate(pos: Vector2, small: bool) -> Node2D:
+func spawn_crate(pos: Vector2, small: bool, contents: Dictionary = {}) -> Node2D:
 	var crate: Node2D = CrateScript.new()
 	crate.position = pos
 	crate.setup(rng, small)
+	if not contents.is_empty():
+		crate.loot = contents
 	items_node.add_child(crate)
 	return crate
 
@@ -227,7 +232,8 @@ func spawn_structure(kind: String, pos: Vector2) -> StaticBody2D:
 	s.position = pos
 	s.setup(kind)
 	items_node.add_child(s)
-	nav_dirty = true    # zombies need to walk around it
+	if nav != null:
+		nav.add_structure(s)   # zombies need to walk around it
 	return s
 
 
@@ -256,6 +262,8 @@ func snap(pos: Vector2) -> Vector2:
 
 
 func start_placing(id: String) -> void:
+	if build != null:
+		build.set_active(false)
 	placing = id
 
 
@@ -289,6 +297,101 @@ func nearest_structure(pos: Vector2, max_dist: float, kind: String = "") -> Node
 	var best_d := max_dist
 	for s in get_tree().get_nodes_in_group("structures"):
 		if kind != "" and s.kind != kind:
+			continue
+		var d: float = s.global_position.distance_to(pos)
+		if d <= best_d:
+			best_d = d
+			best = s
+	return best
+
+
+# ---------------------------------------------------------------- build mode
+
+## True if a build piece fits in this grid square.
+## Pieces may touch each other (that is how you make walls and mazes).
+func can_build(kind: String, pos: Vector2) -> bool:
+	var rect := Rect2(pos - Vector2(16, 16), Vector2(32, 32))
+	if not Rect2(Vector2(32, 32), WORLD_SIZE - Vector2(64, 64)).encloses(rect):
+		return false
+	var inside := rect.grow(-1.0)
+	for r in ruins:
+		if r.intersects(inside):
+			return false
+	for s in get_tree().get_nodes_in_group("structures"):
+		if s.rect().intersects(inside):
+			return false
+	for n in get_tree().get_nodes_in_group("resources"):
+		if rect.grow(n.radius - 2.0).has_point(n.global_position):
+			return false
+	for body in [player] + get_tree().get_nodes_in_group("zombies"):
+		if rect.grow(body.radius - 2.0).has_point(body.global_position):
+			return false
+	return true
+
+
+## Pays for and places a piece. Returns true if it was built.
+func build_piece(kind: String, pos: Vector2) -> bool:
+	pos = nav.cell_center(nav.to_cell(pos))
+	if not Buildings.is_piece(kind) or not can_build(kind, pos):
+		return false
+	var cost: Dictionary = Buildings.cost(kind)
+	if not player.inventory.has_all(cost):
+		hud.show_message("Not enough materials: %s" % _describe(cost), 1.5)
+		return false
+	player.inventory.remove_all(cost)
+	spawn_structure(kind, pos)
+	return true
+
+
+## Removes what you built at this spot. Build pieces give half their cost back,
+## chests and workbenches go back into your inventory. Campfires stay.
+func demolish_at(pos: Vector2) -> bool:
+	for s in get_tree().get_nodes_in_group("structures"):
+		if not s.rect().grow(2.0).has_point(pos) or s.kind == "campfire":
+			continue
+		if Buildings.is_piece(s.kind):
+			for id in Buildings.refund(s.kind):
+				player.inventory.add(id, Buildings.refund(s.kind)[id])
+		elif player.inventory.add(s.kind, 1) == 0:
+			hud.show_message("Inventory full", 1.5)
+			return false
+		if s.storage != null and not s.storage.is_empty():
+			_drop_contents(s)
+		s.remove_from_group("structures")
+		s.queue_free()
+		nav_dirty = true
+		return true
+	return false
+
+
+## Called by a structure when zombies break it.
+func on_structure_destroyed(s: Node2D) -> void:
+	s.remove_from_group("structures")
+	nav_dirty = true
+	if s.storage != null and not s.storage.is_empty():
+		_drop_contents(s)
+	var name: String = Buildings.display_name(s.kind) if Buildings.is_piece(s.kind) else s.kind.capitalize()
+	floating_text(s.global_position, "%s destroyed" % name, Color(1, 0.5, 0.4))
+
+
+func _drop_contents(s: Node2D) -> void:
+	var contents := {}
+	for id in s.storage.ids():
+		contents[id] = s.storage.count(id)
+	spawn_crate.call_deferred(s.global_position, false, contents)
+
+
+func _describe(cost: Dictionary) -> String:
+	var Items = load("res://scripts/items.gd")
+	return Items.describe_cost(cost)
+
+
+## The closest chest, workbench or campfire (things you can press E on).
+func nearest_usable(pos: Vector2, max_dist: float) -> Node2D:
+	var best: Node2D = null
+	var best_d := max_dist
+	for s in get_tree().get_nodes_in_group("structures"):
+		if not s.is_usable():
 			continue
 		var d: float = s.global_position.distance_to(pos)
 		if d <= best_d:
@@ -423,6 +526,10 @@ func _spawn_hud() -> void:
 	placement.game = self
 	world_node.add_child(placement)
 
+	build = BuildModeScript.new()
+	build.game = self
+	world_node.add_child(build)
+
 
 func _spawn_resources() -> void:
 	var center := WORLD_SIZE / 2
@@ -503,6 +610,10 @@ static func setup_input() -> void:
 	_action("close_ui",  0.5, [_key(KEY_ESCAPE), _button(JOY_BUTTON_B)])
 	_action("restart",   0.5, [_key(KEY_ENTER), _button(JOY_BUTTON_A)])
 	_action("debug_input", 0.5, [_key(KEY_F3)])
+	_action("build_mode", 0.5, [_key(KEY_B), _button(JOY_BUTTON_DPAD_RIGHT)])
+	_action("demolish",   0.5, [_mouse(MOUSE_BUTTON_RIGHT), _button(JOY_BUTTON_Y)])
+	_action("build_next", 0.5, [_mouse(MOUSE_BUTTON_WHEEL_DOWN), _button(JOY_BUTTON_RIGHT_SHOULDER)])
+	_action("build_prev", 0.5, [_mouse(MOUSE_BUTTON_WHEEL_UP), _button(JOY_BUTTON_LEFT_SHOULDER)])
 	# Let the left stick move around menus too (the D-pad already does).
 	InputMap.action_add_event("ui_up", _axis(JOY_AXIS_LEFT_Y, -1.0))
 	InputMap.action_add_event("ui_down", _axis(JOY_AXIS_LEFT_Y, 1.0))

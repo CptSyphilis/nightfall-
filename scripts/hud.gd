@@ -3,11 +3,12 @@ extends Control
 ## Everything is drawn with simple shapes and the built-in font.
 
 const Items := preload("res://scripts/items.gd")
+const Buildings := preload("res://scripts/buildings.gd")
 
 const PROMPTS := {
-	"keyboard": {"melee": "right click", "interact": "E", "restart": "Enter", "shoot": "left click", "cancel": "right click", "inventory": "Tab"},
-	"xbox":     {"melee": "RB", "interact": "X", "restart": "A", "shoot": "RT", "cancel": "B", "inventory": "Menu"},
-	"ps":       {"melee": "R1", "interact": "Square", "restart": "Cross", "shoot": "R2", "cancel": "Circle", "inventory": "Options"},
+	"keyboard": {"build": "B", "demolish": "right click", "choose": "wheel / 1-5", "melee": "right click", "interact": "E", "restart": "Enter", "shoot": "left click", "cancel": "right click", "inventory": "Tab"},
+	"xbox":     {"build": "D-pad right", "demolish": "Y", "choose": "LB / RB", "melee": "RB", "interact": "X", "restart": "A", "shoot": "RT", "cancel": "B", "inventory": "Menu"},
+	"ps":       {"build": "D-pad right", "demolish": "Triangle", "choose": "L1 / R1", "melee": "R1", "interact": "Square", "restart": "Cross", "shoot": "R2", "cancel": "Circle", "inventory": "Options"},
 }
 
 const CONTROL_HINTS := {
@@ -70,7 +71,7 @@ func _draw() -> void:
 		if game.nearest_crate(p.global_position, 48.0) != null:
 			what = "search"
 		else:
-			var s = game.nearest_structure(p.global_position, 64.0)
+			var s = game.nearest_usable(p.global_position, 64.0)
 			if s != null:
 				match s.kind:
 					"chest":
@@ -91,13 +92,38 @@ func _draw() -> void:
 		_draw_input_debug(p)
 
 	# Controls reminder for whatever you are playing with.
-	_text(Vector2(20, h - 16), CONTROL_HINTS[p.prompt_style()], 14, Color(1, 1, 1, 0.55))
+	if game.build != null and game.build.active and not game.ui_open:
+		_draw_build_bar(p, w, h)
+	else:
+		_text(Vector2(20, h - 16), CONTROL_HINTS[p.prompt_style()] + "   %s build" % prompt("build"), 14, Color(1, 1, 1, 0.55))
 
 	if game.game_over:
 		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.65))
 		_text_centered(h / 2 - 30, "YOU DIED", 48, Color(0.9, 0.2, 0.2))
 		_text_centered(h / 2 + 15, "Survived to day %d with %d kills" % [game.day, game.kills], 20)
 		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
+
+
+## Build mode: the row of pieces at the bottom, what they cost, and the controls.
+func _draw_build_bar(p, w: float, h: float) -> void:
+	var slot := Vector2(170, 62)
+	var gap := 8.0
+	var n := Buildings.ORDER.size()
+	var x0 := (w - (slot.x * n + gap * (n - 1))) / 2.0
+	var y0 := h - 112.0
+	for i in n:
+		var kind: String = Buildings.ORDER[i]
+		var r := Rect2(Vector2(x0 + i * (slot.x + gap), y0), slot)
+		var chosen: bool = kind == game.build.selected
+		var afford: bool = p.inventory.has_all(Buildings.cost(kind))
+		draw_rect(r, Color(0.05, 0.05, 0.06, 0.85))
+		draw_rect(r, Color(1, 0.85, 0.4) if chosen else Color(1, 1, 1, 0.25), false, 3.0 if chosen else 1.0)
+		_text(r.position + Vector2(8, 18), "%d  %s" % [i + 1, Buildings.display_name(kind)], 15, Color(1, 0.92, 0.75) if chosen else Color.WHITE)
+		_text(r.position + Vector2(8, 37), Items.describe_cost(Buildings.cost(kind)), 13, Color(0.7, 1, 0.7) if afford else Color(1, 0.45, 0.4))
+		_text(r.position + Vector2(8, 54), Buildings.INFO[kind], 11, Color(1, 1, 1, 0.6))
+	var hint := "BUILD MODE   %s build (hold to drag)   %s demolish   %s choose   %s exit" % [
+		prompt("shoot"), prompt("demolish"), prompt("choose"), prompt("build")]
+	_text_centered(h - 18.0, hint, 15, Color(1, 0.92, 0.75))
 
 
 ## F3 input checker: shows what the controller sends, to fix button mapping problems.

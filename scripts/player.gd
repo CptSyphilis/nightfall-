@@ -161,8 +161,9 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("interact"):
 			interact()   # also closes the menu when it is open
 		if not in_menu:
-			# No fighting while placing a structure.
-			var can_fight: bool = game.placing == "" and action_block <= 0.0
+			# No fighting while placing or building (the same buttons build and demolish).
+			var building: bool = game.build != null and game.build.active
+			var can_fight: bool = game.placing == "" and action_block <= 0.0 and not building
 			if can_fight and (Input.is_action_pressed("shoot") or web_r2 > 0.5):
 				shoot()
 			if can_fight and Input.is_action_pressed("melee"):
@@ -171,9 +172,9 @@ func _physics_process(delta: float) -> void:
 				heal()
 			if Input.is_action_just_pressed("dodge"):
 				dodge(move)
-			if Input.is_action_just_pressed("ability"):
+			if Input.is_action_just_pressed("ability") and not building:
 				shockwave()
-			if Input.is_action_just_pressed("reload"):
+			if Input.is_action_just_pressed("reload") and not building:
 				start_reload()
 			if Input.is_action_just_pressed("eat"):
 				eat()
@@ -453,7 +454,7 @@ func interact() -> bool:
 	var crate: Node2D = game.nearest_crate(global_position, 48.0)
 	if crate != null:
 		return _search_crate(crate)
-	var s: Node2D = game.nearest_structure(global_position, 64.0)
+	var s: Node2D = game.nearest_usable(global_position, 64.0)
 	if s != null:
 		match s.kind:
 			"chest":

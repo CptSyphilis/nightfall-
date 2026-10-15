@@ -517,6 +517,140 @@ func _run() -> void:
 	p.controls_enabled = false
 	p.use_mouse_aim = false
 
+	# --- build mode (walls, doors, traps, towers)
+	reset_player()
+	await clear_zombies()
+	# Clear earlier test buildings (keep the campfire) and loot near the start.
+	for st in get_nodes_in_group("structures"):
+		if st.kind != "campfire":
+			st.remove_from_group("structures")
+			st.queue_free()
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 300:
+			c.queue_free()
+	for res in get_nodes_in_group("resources"):
+		if res.global_position.distance_to(p.position) < 420:
+			res.depleted = true
+			res.remove_from_group("resources")
+			res.queue_free()
+	game.nav_dirty = true
+	await frames(2)
+	var nav = game.nav
+	var home: Vector2i = nav.to_cell(p.position)
+	var cellpos := func(dx: int, dy: int) -> Vector2: return nav.cell_center(home + Vector2i(dx, dy))
+	var bag2 = p.inventory
+	for id in ["wood", "stone", "scrap"]:
+		bag2.set_count(id, 0)
+
+	game.build.set_active(true)
+	check(game.build.active, "B turns on build mode")
+	check(not game.build_piece("wood_wall", cellpos.call(3, 0)), "cannot build without materials")
+	bag2.set_count("wood", 200)
+	bag2.set_count("stone", 100)
+	bag2.set_count("scrap", 30)
+	check(game.build_piece("wood_wall", cellpos.call(3, 0)), "build a wood wall")
+	check(bag2.count("wood") == 198, "a wood wall costs 2 wood")
+	check(not nav.is_free(cellpos.call(3, 0)), "zombies path around a new wall right away")
+	check(game.build_piece("wood_wall", cellpos.call(3, 1)), "walls can sit right next to each other")
+	check(not game.build_piece("wood_wall", cellpos.call(3, 1)), "cannot build two pieces in one square")
+	check(not game.build_piece("wood_wall", cellpos.call(0, 0)), "cannot build on yourself")
+	check(not game.can_build("wood_wall", game.ruins[0].get_center()), "cannot build inside a ruin")
+
+	var wood_before: int = bag2.count("wood")
+	check(game.demolish_at(cellpos.call(3, 1)), "demolish a wall")
+	check(bag2.count("wood") == wood_before + 1, "demolishing gives half the cost back")
+	await frames(2)
+	check(nav.is_free(cellpos.call(3, 1)), "a demolished wall frees the path")
+	game.demolish_at(cellpos.call(3, 0))
+	await frames(2)
+
+	# Door: the player walks through, zombies don't.
+	check(game.build_piece("door", cellpos.call(0, 3)), "build a door")
+	var door = null
+	for st in get_nodes_in_group("structures"):
+		if st.kind == "door":
+			door = st
+	check(door != null and door.collision_layer == 16 and (p.collision_mask & 16) == 0, "the player can walk through doors")
+	check(not nav.is_free(door.global_position), "zombies treat doors as walls")
+	game.demolish_at(door.global_position)
+
+	# Spike trap: zombies walk over it and get hurt.
+	check(game.build_piece("spikes", cellpos.call(-3, -3)), "build a spike trap")
+	check(nav.is_free(cellpos.call(-3, -3)), "zombies can walk over spike traps")
+	z = game.spawn_zombie(cellpos.call(-3, -3), false)
+	await frames(3)
+	check(z.health < z.max_health and z.slow_timer > 0.0, "spikes hurt and slow zombies")
+	await clear_zombies()
+
+	# Arrow tower: shoots zombies on its own.
+	check(game.build_piece("tower", cellpos.call(0, -4)), "build an arrow tower")
+	z = game.spawn_zombie(cellpos.call(0, -4) + Vector2(220, -60), false)
+	await frames(1)
+	var zhp: float = z.health
+	await frames(90)
+	check(not is_instance_valid(z) or z.health < zhp, "the tower shoots zombies")
+	await clear_zombies()
+
+	# Maze: zombies follow the open route instead of breaking walls.
+	for dy in range(-6, 7):
+		if dy != 6:
+			game.build_piece("wood_wall", cellpos.call(5, dy))
+	await frames(2)
+	var maze_walls := []
+	for st in get_nodes_in_group("structures"):
+		if st.kind == "wood_wall":
+			maze_walls.append(st)
+	check(maze_walls.size() == 12, "a 12-wall maze line was built")
+	z = game.spawn_zombie(cellpos.call(9, 0), true)
+	await frames(1)
+	var got_me := false
+	for i in 900:
+		await physics_frame
+		if p.health < p.max_health:
+			got_me = true
+			break
+	var all_intact := true
+	for wall in maze_walls:
+		all_intact = all_intact and is_instance_valid(wall) and wall.hp == wall.max_hp
+	check(got_me, "zombie finds the way through the maze gap")
+	check(all_intact, "zombie does not break walls while a route is open")
+	await clear_zombies()
+
+	# Walled in: no route left, so zombies smash through.
+	reset_player()
+	var ring := []
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			if maxi(absi(dx), absi(dy)) == 2:
+				game.build_piece("wood_wall", cellpos.call(dx, dy))
+	for st in get_nodes_in_group("structures"):
+		if st.kind == "wood_wall" and not st in maze_walls:
+			ring.append(st)
+	check(ring.size() == 16, "player is walled in by 16 walls")
+	# The maze line is still standing in front of the base, like a Maul map.
+	z = game.spawn_zombie(cellpos.call(9, 0), true)
+	var smashed := false
+	for i in 1500:
+		await physics_frame
+		for wall in ring:
+			if not is_instance_valid(wall) or wall.hp < wall.max_hp:
+				smashed = true
+		if smashed:
+			break
+	check(smashed, "walled-in player: zombies smash the base walls")
+	var maze_intact := true
+	for wall in maze_walls:
+		maze_intact = maze_intact and is_instance_valid(wall) and wall.hp == wall.max_hp
+	check(maze_intact, "zombies walk the maze to the base instead of breaking the maze")
+	await clear_zombies()
+	for st in get_nodes_in_group("structures"):
+		if st.kind != "campfire":
+			st.remove_from_group("structures")
+			st.queue_free()
+	game.nav_dirty = true
+	game.build.set_active(false)
+	await frames(2)
+
 	# --- zombie pathing and sight
 	reset_player()
 	await clear_zombies()

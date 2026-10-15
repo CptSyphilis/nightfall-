@@ -13,6 +13,9 @@ extends CharacterBody2D
 ##   buildings, trees, rocks and anything you built, and follows it.
 ##   It also keeps a little distance from other zombies, and if it stops
 ##   making progress it re-plans and steps sideways.
+##   If there is NO open way to you (you walled yourself in), it walks up to
+##   the nearest wall and smashes it. While any route is open it follows the
+##   route instead, which is what makes maze building work.
 
 const SIGHT_CHECK_TIME := 0.2    # how often it looks for you
 const LINE_CHECK_TIME := 0.15    # how often it checks if the way ahead is clear
@@ -33,6 +36,7 @@ var investigate_timer := 0.0
 var attack_cd := 0.0
 var knockback := Vector2.ZERO
 var hurt_flash := 0.0
+var slow_timer := 0.0        # set by spike traps: half speed while > 0
 var dead := false
 
 var game: Node
@@ -52,6 +56,7 @@ var _path_goal := Vector2.INF
 var _repath_timer := 0.0
 var _line_timer := 0.0
 var _goal_in_view := false
+var _path_blocked := false     # true when no route reaches the goal: time to break walls
 
 # Getting unstuck
 var _stuck_timer := 0.0
@@ -72,7 +77,7 @@ func setup(day: int, horde: bool) -> void:
 func _ready() -> void:
 	add_to_group("zombies")
 	collision_layer = 4
-	collision_mask = 1 | 2 | 4
+	collision_mask = 1 | 2 | 4 | 16   # 16 = doors (the player walks through them, zombies don't)
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	var shape := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
@@ -99,6 +104,7 @@ func _physics_process(delta: float) -> void:
 		return
 	attack_cd = maxf(attack_cd - delta, 0.0)
 	hurt_flash = maxf(hurt_flash - delta, 0.0)
+	slow_timer = maxf(slow_timer - delta, 0.0)
 
 	var player_alive: bool = is_instance_valid(player) and not player.dead
 	var dist := INF
@@ -142,10 +148,16 @@ func _physics_process(delta: float) -> void:
 	if dir.length() > 1.0:
 		dir = dir.normalized()
 
+	if slow_timer > 0.0:
+		move_speed *= 0.5
 	velocity = dir * move_speed + knockback
 	knockback = knockback.move_toward(Vector2.ZERO, 1400.0 * delta)
 	move_and_slide()
 	_check_stuck(delta, has_goal)
+	# Walled off: follow the route as far as it goes (through any maze),
+	# and only start smashing once there is nowhere further to walk.
+	if has_goal and _path_blocked and _path_i >= _path.size() - 1:
+		_smash_what_is_in_the_way()
 
 	if player_alive and dist < radius + player.radius + 10.0 and attack_cd <= 0.0:
 		attack_cd = 1.0
@@ -211,6 +223,7 @@ func _steer_towards(goal: Vector2, delta: float) -> Vector2:
 
 	if _goal_in_view or game == null or game.nav == null:
 		_path.clear()
+		_path_blocked = false
 		return global_position.direction_to(goal)
 
 	_repath_timer -= delta
@@ -229,6 +242,21 @@ func _repath(goal: Vector2) -> void:
 	_path_i = 1 if _path.size() > 1 else 0    # point 0 is the square we stand on
 	_path_goal = goal
 	_repath_timer = _rng.randf_range(0.5, 0.9)
+	# The path ends as close as it can get. If that is still far from the goal,
+	# the way is walled off.
+	_path_blocked = _path.is_empty() or _path[_path.size() - 1].distance_to(goal) > 48.0
+
+
+## Hit whatever built thing we are pressed against (only used when walled off).
+func _smash_what_is_in_the_way() -> void:
+	if attack_cd > 0.0:
+		return
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i).get_collider()
+		if c != null and c.is_in_group("structures") and c.breakable:
+			attack_cd = 1.0
+			c.take_damage(damage * 1.5)
+			return
 
 
 ## A small push away from zombies that are too close, so crowds don't jam.

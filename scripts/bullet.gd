@@ -8,6 +8,7 @@ var damage := 45.0
 var speed := 1100.0
 var life := 0.8
 var style := "bullet"   # "bullet" or "arrow"
+var mask := 1 | 4       # what it can hit: 1 = walls/trees/rocks, 4 = zombies
 
 
 func _physics_process(delta: float) -> void:
@@ -17,7 +18,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var step := direction * speed * delta
 	# Layer 1 = walls/trees/rocks, layer 3 (value 4) = zombies.
-	var query := PhysicsRayQueryParameters2D.create(global_position, global_position + step, 1 | 4)
+	var query := PhysicsRayQueryParameters2D.create(global_position, global_position + step, mask)
 	# Slow arrows can start a frame already inside a zombie walking into them.
 	# Without this the ray would ignore that zombie and fly straight through.
 	query.hit_from_inside = true

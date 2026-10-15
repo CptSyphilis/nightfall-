@@ -27,6 +27,12 @@ func build(world_size: Vector2, ruins: Array[Rect2], game: Node) -> void:
 		if not res.depleted:
 			_block_circle(res.global_position, res.radius)
 	for s in game.get_tree().get_nodes_in_group("structures"):
+		add_structure(s)
+
+
+## Marks one new structure as solid (quick, no full rebuild needed).
+func add_structure(s: Node2D) -> void:
+	if s.blocks_path():
 		_block_rect(s.rect())
 
 
