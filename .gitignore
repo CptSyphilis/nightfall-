@@ -1,6 +1,7 @@
 .godot/
 build/
 *.import
+*.uid
 
 # Planning notes stay out of the repo (the roadmap lives in the claude.ai project)
 roadmap.md
