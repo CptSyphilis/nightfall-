@@ -505,6 +505,21 @@ func _search_crate(crate: Node2D) -> bool:
 	return true
 
 
+## Throws away a whole stack. It lands in a bag at your feet, so you can pick it up again.
+func discard(id: String) -> bool:
+	var amount: int = inventory.count(id)
+	if dead or amount <= 0:
+		return false
+	inventory.set_count(id, 0)
+	if id == melee_weapon:
+		unequip("melee")
+	if id == ranged_weapon:
+		unequip("ranged")
+	game.spawn_crate(global_position, true, {id: amount})
+	game.hud.show_message("Dropped %d %s" % [amount, Items.display_name(id)], 1.5)
+	return true
+
+
 ## H key: use a bandage, or a medkit if you have no bandages.
 func heal() -> bool:
 	if inventory.count("bandage") > 0:

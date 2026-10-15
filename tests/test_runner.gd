@@ -792,6 +792,44 @@ func _run() -> void:
 		p.inventory.set_count(id, 0)
 	await frames(1)
 
+	# --- discard
+	reset_player()
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	await frames(1)
+	p.inventory.set_count("club", 1)
+	p.equip("club")
+	p.inventory.set_count("stone", 7)
+	check(p.discard("stone") and p.inventory.count("stone") == 0, "discard throws away a stack")
+	check(p.discard("club") and p.melee_weapon == "fists", "discarding your equipped weapon unequips it")
+	check(not p.discard("stone"), "cannot discard what you do not have")
+	await frames(2)
+	var bags := 0
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 40:
+			bags += 1
+	check(bags >= 1, "dropped items land in a bag at your feet")
+	check(p.interact() and p.inventory.count("stone") + p.inventory.count("club") > 0, "you can pick dropped items back up")
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	p.inventory.set_count("stone", 0)
+	p.inventory.set_count("club", 0)
+	p.inventory.set_count("wood", 4)
+	game.ui.open()
+	game.ui._on_discard_toggle()
+	game.ui._on_player_item("wood")
+	check(game.ui.discard_mode and p.inventory.count("wood") == 0, "discard mode in the character screen drops the item")
+	game.ui.close()
+	game.ui.open()
+	check(not game.ui.discard_mode, "discard mode turns off when the screen reopens")
+	game.ui.close()
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	await frames(1)
+
 	# --- death
 	reset_player()
 	p.take_damage(1000)

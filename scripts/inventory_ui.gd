@@ -14,6 +14,7 @@ var _inv: VBoxContainer
 var _side: VBoxContainer
 var _last_signature := ""
 var _focus_key := ""     # which button had controller focus, kept across rebuilds
+var discard_mode := false   # when on, selecting an item throws it away
 
 
 func _ready() -> void:
@@ -60,6 +61,7 @@ func open() -> void:
 	if game.game_over:
 		return
 	chest = null
+	discard_mode = false
 	visible = true
 	refresh(true)
 
@@ -68,6 +70,7 @@ func open_chest(c: Node) -> void:
 	if game.game_over:
 		return
 	chest = c
+	discard_mode = false
 	visible = true
 	refresh(true)
 
@@ -112,7 +115,8 @@ func _process(_delta: float) -> void:
 func refresh(force: bool = false) -> void:
 	var p = game.player
 	var sig: String = p.inventory.signature() + str(p.near_workbench()) + p.melee_weapon + p.ranged_weapon \
-		+ str(int(p.health)) + str(int(p.hunger)) + str(p.using_controller)
+		+ str(int(p.health)) + str(int(p.hunger)) + str(p.using_controller) + str(discard_mode) \
+		+ str(p.inventory.max_slots)
 	if chest != null:
 		sig += chest.storage.signature()
 	for c in p.nearby_chests():
@@ -184,7 +188,17 @@ func _build_inventory(p) -> void:
 	_inv.add_child(_item_grid(inv, _on_player_item, p))
 	var hint := "Select an item to put it in the chest" if chest != null \
 		else "Select a weapon to equip it.\nSelect food or medicine to use it.\nSelect a chest or workbench to place it."
+	if discard_mode:
+		hint = "DISCARD MODE: select an item to drop it on the ground"
 	_inv.add_child(_small(hint))
+	var d := _button("Discard mode: ON" if discard_mode else "Discard mode: off")
+	d.custom_minimum_size = Vector2(150, 30)
+	d.add_theme_font_size_override("font_size", 14)
+	if discard_mode:
+		d.add_theme_color_override("font_color", Color(1, 0.45, 0.4))
+	d.set_meta("key", "discard")
+	d.pressed.connect(_on_discard_toggle)
+	_inv.add_child(d)
 
 
 func _build_chest() -> void:
@@ -332,7 +346,9 @@ func _small(text: String) -> Label:
 
 func _on_player_item(id: String) -> void:
 	var p = game.player
-	if chest != null:
+	if discard_mode:
+		p.discard(id)
+	elif chest != null:
 		game.transfer(p.inventory, chest.storage, id, p.inventory.count(id))
 	elif Items.is_weapon(id):
 		p.equip(id)
@@ -343,6 +359,11 @@ func _on_player_item(id: String) -> void:
 	elif Items.is_placeable(id):
 		close()
 		game.start_placing(id)
+	refresh(true)
+
+
+func _on_discard_toggle() -> void:
+	discard_mode = not discard_mode
 	refresh(true)
 
 
