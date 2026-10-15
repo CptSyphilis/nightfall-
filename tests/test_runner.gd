@@ -759,6 +759,21 @@ func _run() -> void:
 	game.lose_reason = ""
 	await clear_zombies()
 
+	# --- loot rates
+	var CrateScript = load("res://scripts/loot_crate.gd")
+	var totals := {}
+	for i in 2000:
+		var lc = CrateScript.new()
+		lc.setup(game.rng, i % 2 == 0)
+		for id in lc.loot:
+			totals[id] = totals.get(id, 0) + lc.loot[id]
+		lc.free()
+	check(totals.get("medkit", 0) == 0, "medkits are never found as loot")
+	check(totals.get("bandage", 0) > 0, "bandages can be found as loot")
+	check(totals.get("ammo", 0) / 2000.0 < 2.5, "ammo is rarer (%.1f per crate)" % (totals.get("ammo", 0) / 2000.0))
+	check(totals.get("arrow", 0) / 2000.0 < 0.4, "arrows are rarer (%.2f per crate)" % (totals.get("arrow", 0) / 2000.0))
+	check(game.ZOMBIE_DROP_CHANCE <= 0.1, "zombies drop bags less often")
+
 	# --- death
 	reset_player()
 	p.take_damage(1000)

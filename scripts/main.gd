@@ -11,6 +11,7 @@ extends Node2D
 const WORLD_SIZE := Vector2(3200, 3200)
 const SAFE_RADIUS := 320.0   # nothing spawns this close to the start point
 const CELL := 32.0           # the building grid; everything on the map lines up with it
+const ZOMBIE_DROP_CHANCE := 0.1   # chance a killed zombie drops a bag
 const CAMPFIRE_LIVES := 10   # zombies reaching the campfire cost one each; at 0 you lose
 
 const PlayerScript := preload("res://scripts/player.gd")
@@ -448,7 +449,7 @@ func make_noise(pos: Vector2, radius: float) -> void:
 
 func on_zombie_killed(z: Node2D) -> void:
 	kills += 1
-	if rng.randf() < 0.2:
+	if rng.randf() < ZOMBIE_DROP_CHANCE:
 		spawn_crate.call_deferred(z.global_position, true)
 
 
