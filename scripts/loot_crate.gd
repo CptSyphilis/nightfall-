@@ -35,7 +35,7 @@ func open() -> Dictionary:
 	if opened:
 		return {}
 	opened = true
-	queue_redraw()
+	queue_free()   # searched crates disappear
 	return loot
 
 

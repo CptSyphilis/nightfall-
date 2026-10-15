@@ -58,7 +58,9 @@ Craft them in the character screen, then select one to equip it.
 
 Building (Maul-style mazes)
 ---------------------------
-Press B to build. Pieces snap to a grid and are paid from your inventory:
+Press B to build. A faint grid shows where pieces go; everything on the map
+lines up with it. Pieces are paid from your inventory:
+  Campfire      6 wood, 4 stone            starts the night; defend it (only one)
   Wood wall     2 wood                     cheap, good for mazes
   Stone wall    2 stone, 1 wood            tough
   Door          4 wood, 1 scrap            you walk through, zombies don't
@@ -71,8 +73,13 @@ walls and smash through.
 
 How it plays
 ------------
-Day:   no zombies and no timer. Gather wood, stone and scrap, search crates,
-       craft, and build your base. Use the campfire (press twice) when ready.
+Day:   no zombies and no timer. Gather wood, stone and scrap, search crates
+       (they vanish once searched), craft, and build your base.
+       Build ONE campfire and use it (press twice) when you are ready.
+Campfire: the heart of your base. Horde zombies head for it, Maul style.
+       Each one that reaches it costs a life. 10 lives; at 0 you lose.
+       You can move it by demolishing it during the day (full refund).
+Workbench: crafting there can also use items from chests near it.
 Night: it gets dark and the horde hunts you. 60 seconds on night 1,
        10 seconds longer each night (max 2 minutes).
 Dawn:  the zombies are gone and a new day starts. They get tougher every night.

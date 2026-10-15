@@ -25,6 +25,7 @@ const REGEN := 0.6              # health per second when well fed
 const HEAL_BANDAGE := 25.0
 const HEAL_MEDKIT := 60.0
 const WORKBENCH_RANGE := 90.0
+const CHEST_RANGE := 300.0      # chests this close to a workbench share their items when crafting
 
 const BulletScript := preload("res://scripts/bullet.gd")
 const InventoryScript := preload("res://scripts/inventory.gd")
@@ -502,6 +503,50 @@ func heal_with(id: String) -> bool:
 
 # ---------------------------------------------------------------- crafting and building
 
+## Chests close to the workbench you are standing at. Crafting there can use
+## their items as well as your own. Empty if you are not at a workbench.
+func nearby_chests() -> Array:
+	var bench: Node2D = game.nearest_structure(global_position, WORKBENCH_RANGE, "workbench")
+	if bench == null:
+		return []
+	var chests := []
+	for s in get_tree().get_nodes_in_group("structures"):
+		if s.kind == "chest" and s.global_position.distance_to(bench.global_position) <= CHEST_RANGE:
+			chests.append(s)
+	return chests
+
+
+## How many of an item you can use for crafting right now (yours + nearby chests).
+func material_count(id: String) -> int:
+	var total: int = inventory.count(id)
+	for c in nearby_chests():
+		total += c.storage.count(id)
+	return total
+
+
+func can_afford(cost: Dictionary) -> bool:
+	for id in cost:
+		if material_count(id) < cost[id]:
+			return false
+	return true
+
+
+## Takes the cost from your inventory first, then from nearby chests.
+func pay(cost: Dictionary) -> void:
+	var chests := nearby_chests()
+	for id in cost:
+		var left: int = cost[id]
+		var mine := mini(left, inventory.count(id))
+		inventory.remove(id, mine)
+		left -= mine
+		for c in chests:
+			if left <= 0:
+				break
+			var take := mini(left, c.storage.count(id))
+			c.storage.remove(id, take)
+			left -= take
+
+
 func near_workbench() -> bool:
 	return game.nearest_structure(global_position, WORKBENCH_RANGE, "workbench") != null
 
@@ -512,7 +557,7 @@ func can_craft(id: String) -> bool:
 		return false
 	if r["bench"] and not near_workbench():
 		return false
-	if not inventory.has_all(r["cost"]):
+	if not can_afford(r["cost"]):
 		return false
 	return inventory.space_for(id) >= r["amount"]
 
@@ -521,7 +566,7 @@ func craft(id: String) -> bool:
 	if not can_craft(id):
 		return false
 	var r: Dictionary = Items.recipe(id)
-	inventory.remove_all(r["cost"])
+	pay(r["cost"])
 	inventory.add(id, r["amount"])
 	game.floating_text(global_position + Vector2(0, -30), "Crafted %s" % Items.display_name(id), Color(0.6, 1, 0.6))
 	return true
@@ -529,6 +574,7 @@ func craft(id: String) -> bool:
 
 ## Puts a chest or workbench from your inventory into the world.
 func place_structure(id: String, pos: Vector2) -> bool:
+	pos = game.snap_for(id, pos)
 	if dead or inventory.count(id) <= 0 or not game.can_place(id, pos):
 		return false
 	inventory.remove(id, 1)

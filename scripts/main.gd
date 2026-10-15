@@ -10,7 +10,8 @@ extends Node2D
 
 const WORLD_SIZE := Vector2(3200, 3200)
 const SAFE_RADIUS := 320.0   # nothing spawns this close to the start point
-const CAMPFIRE_OFFSET := Vector2(-90, 90)   # where the starting campfire sits
+const CELL := 32.0           # the building grid; everything on the map lines up with it
+const CAMPFIRE_LIVES := 10   # zombies reaching the campfire cost one each; at 0 you lose
 
 const PlayerScript := preload("res://scripts/player.gd")
 const ZombieScript := preload("res://scripts/zombie.gd")
@@ -23,6 +24,7 @@ const PlacementScript := preload("res://scripts/placement.gd")
 const FloatingTextScript := preload("res://scripts/floating_text.gd")
 const NavGridScript := preload("res://scripts/nav_grid.gd")
 const BuildModeScript := preload("res://scripts/build_mode.gd")
+const GridOverlayScript := preload("res://scripts/grid_overlay.gd")
 const Buildings := preload("res://scripts/buildings.gd")
 
 const DAY_COLOR := Color(1, 1, 1)
@@ -50,6 +52,8 @@ var night_amount := 0.0   # 0 = full daylight, 1 = full night (used for the play
 var phase_time := 0.0
 var kills := 0
 var game_over := false
+var lose_reason := ""
+var lives := CAMPFIRE_LIVES
 var spawning_enabled := true
 var trickle_timer := 0.0
 var horde_left := 0
@@ -72,10 +76,9 @@ func _ready() -> void:
 	_spawn_hud()
 	_spawn_crates()
 	_spawn_resources()
-	spawn_structure("campfire", WORLD_SIZE / 2 + CAMPFIRE_OFFSET)
 	nav = NavGridScript.new()
 	nav.build(WORLD_SIZE, ruins, self)
-	hud.show_message("Day 1 - gather and build. Use the campfire when you are ready for the night.", 6.0)
+	hud.show_message("Day 1 - gather and build. Build a campfire (B) and defend it at night.", 6.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -189,7 +192,7 @@ func spawn_zombie(pos: Vector2, horde: bool) -> CharacterBody2D:
 
 func spawn_crate(pos: Vector2, small: bool, contents: Dictionary = {}) -> Node2D:
 	var crate: Node2D = CrateScript.new()
-	crate.position = pos
+	crate.position = cell_center(pos)
 	crate.setup(rng, small)
 	if not contents.is_empty():
 		crate.loot = contents
@@ -220,7 +223,7 @@ func point_is_free(p: Vector2) -> bool:
 
 func spawn_resource(kind: String, pos: Vector2) -> StaticBody2D:
 	var node: StaticBody2D = ResourceScript.new()
-	node.position = pos
+	node.position = cell_center(pos)
 	node.setup(kind)
 	items_node.add_child(node)
 	nav_dirty = true    # zombies need to walk around it
@@ -256,6 +259,19 @@ func floating_text(pos: Vector2, text: String, color: Color = Color.WHITE) -> vo
 
 
 # ---------------------------------------------------------------- building
+
+## The center of the grid square that `pos` is in.
+func cell_center(pos: Vector2) -> Vector2:
+	return (pos / CELL).floor() * CELL + Vector2(CELL, CELL) / 2.0
+
+
+## Where a structure of this kind sits when placed near `pos`, lined up with the grid
+## (a 64x32 workbench covers exactly two squares, a 32x32 chest exactly one).
+func snap_for(kind: String, pos: Vector2) -> Vector2:
+	var size: Vector2 = StructureScript.SIZES[kind]
+	var top_left := ((pos - size / 2.0) / CELL).round() * CELL
+	return top_left + size / 2.0
+
 
 func snap(pos: Vector2) -> Vector2:
 	return (pos / 16.0).round() * 16.0
@@ -310,6 +326,8 @@ func nearest_structure(pos: Vector2, max_dist: float, kind: String = "") -> Node
 ## True if a build piece fits in this grid square.
 ## Pieces may touch each other (that is how you make walls and mazes).
 func can_build(kind: String, pos: Vector2) -> bool:
+	if kind == "campfire" and campfire() != null:
+		return false   # only one campfire
 	var rect := Rect2(pos - Vector2(16, 16), Vector2(32, 32))
 	if not Rect2(Vector2(32, 32), WORLD_SIZE - Vector2(64, 64)).encloses(rect):
 		return false
@@ -332,6 +350,9 @@ func can_build(kind: String, pos: Vector2) -> bool:
 ## Pays for and places a piece. Returns true if it was built.
 func build_piece(kind: String, pos: Vector2) -> bool:
 	pos = nav.cell_center(nav.to_cell(pos))
+	if kind == "campfire" and campfire() != null:
+		hud.show_message("You can only have one campfire (demolish it to move it)", 2.0)
+		return false
 	if not Buildings.is_piece(kind) or not can_build(kind, pos):
 		return false
 	var cost: Dictionary = Buildings.cost(kind)
@@ -347,9 +368,15 @@ func build_piece(kind: String, pos: Vector2) -> bool:
 ## chests and workbenches go back into your inventory. Campfires stay.
 func demolish_at(pos: Vector2) -> bool:
 	for s in get_tree().get_nodes_in_group("structures"):
-		if not s.rect().grow(2.0).has_point(pos) or s.kind == "campfire":
+		if not s.rect().grow(2.0).has_point(pos):
 			continue
-		if Buildings.is_piece(s.kind):
+		if s.kind == "campfire":
+			if is_night:
+				hud.show_message("You can't move the campfire at night", 1.5)
+				return false
+			for id in Buildings.cost("campfire"):   # full refund, so you can move it
+				player.inventory.add(id, Buildings.cost("campfire")[id])
+		elif Buildings.is_piece(s.kind):
 			for id in Buildings.refund(s.kind):
 				player.inventory.add(id, Buildings.refund(s.kind)[id])
 		elif player.inventory.add(s.kind, 1) == 0:
@@ -437,6 +464,33 @@ func nearest_crate(pos: Vector2, max_dist: float) -> Node2D:
 
 func _on_player_died() -> void:
 	game_over = true
+	lose_reason = "You died"
+
+
+## The campfire, or null if you have not built one yet. There can only be one.
+func campfire() -> Node2D:
+	for s in get_tree().get_nodes_in_group("structures"):
+		if s.kind == "campfire":
+			return s
+	return null
+
+
+## A zombie reached the campfire: it costs a life (and the zombie).
+func campfire_hit(z: Node2D) -> void:
+	if game_over:
+		return
+	z.dead = true
+	z.queue_free()
+	lives -= 1
+	var fire := campfire()
+	if fire != null:
+		floating_text(fire.global_position + Vector2(0, -26), "-1 life", Color(1, 0.4, 0.3))
+	if lives <= 0:
+		lives = 0
+		game_over = true
+		lose_reason = "The zombies overran your campfire"
+	else:
+		hud.show_message("A zombie reached the campfire!  %d lives left" % lives, 2.0)
 
 
 # ---------------------------------------------------------------- world building
@@ -445,6 +499,10 @@ func _build_world() -> void:
 	tint = CanvasModulate.new()
 	tint.color = DAY_COLOR
 	add_child(tint)
+
+	var grid := GridOverlayScript.new()
+	grid.game = self
+	add_child(grid)
 
 	items_node = Node2D.new()
 	add_child(items_node)
@@ -462,12 +520,14 @@ func _build_world() -> void:
 	var tries := 0
 	while ruins.size() < 45 and tries < 600:
 		tries += 1
-		var size := Vector2(rng.randf_range(80, 260), rng.randf_range(80, 220))
-		var pos := Vector2(
+		# Sizes and positions are whole grid squares so everything lines up.
+		var size := (Vector2(rng.randf_range(96, 256), rng.randf_range(96, 224)) / CELL).round() * CELL
+		var pos := (Vector2(
 			rng.randf_range(100, WORLD_SIZE.x - 100 - size.x),
-			rng.randf_range(100, WORLD_SIZE.y - 100 - size.y))
+			rng.randf_range(100, WORLD_SIZE.y - 100 - size.y)) / CELL).round() * CELL
 		var rect := Rect2(pos, size)
-		if rect.grow(SAFE_RADIUS).has_point(center):
+		# One extra grid square of margin, since snapping can move a ruin up to half a square closer.
+		if rect.grow(SAFE_RADIUS + CELL).has_point(center):
 			continue
 		var overlaps := false
 		for r in ruins:
@@ -540,6 +600,9 @@ func _spawn_resources() -> void:
 		spawn_resource(n[0], center + Vector2.from_angle(n[2]) * n[1])
 	# The rest scattered over the map, keeping off the roads.
 	var counts := {"tree": 90, "rock": 45, "scrap": 35}
+	var used := {}
+	for n in get_tree().get_nodes_in_group("resources"):
+		used[n.position] = true
 	for kind in counts:
 		var placed := 0
 		var tries := 0
@@ -548,8 +611,11 @@ func _spawn_resources() -> void:
 			var p := Vector2(rng.randf_range(80, WORLD_SIZE.x - 80), rng.randf_range(80, WORLD_SIZE.y - 80))
 			if not point_is_free(p) or p.distance_to(center) < 350:
 				continue
-			if absf(p.x - center.x) < 90 or absf(p.y - center.y) < 90:
+			if absf(p.x - center.x) < 96 or absf(p.y - center.y) < 96:
 				continue
+			if used.has(cell_center(p)) or not point_is_free(cell_center(p)):
+				continue
+			used[cell_center(p)] = true
 			spawn_resource(kind, p)
 			placed += 1
 
@@ -572,8 +638,8 @@ func _spawn_crates() -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Color(0.23, 0.3, 0.18))
 	# Two cracked roads crossing the map.
-	draw_rect(Rect2(0, WORLD_SIZE.y / 2 - 60, WORLD_SIZE.x, 120), Color(0.22, 0.22, 0.22))
-	draw_rect(Rect2(WORLD_SIZE.x / 2 - 60, 0, 120, WORLD_SIZE.y), Color(0.22, 0.22, 0.22))
+	draw_rect(Rect2(0, WORLD_SIZE.y / 2 - 64, WORLD_SIZE.x, 128), Color(0.22, 0.22, 0.22))
+	draw_rect(Rect2(WORLD_SIZE.x / 2 - 64, 0, 128, WORLD_SIZE.y), Color(0.22, 0.22, 0.22))
 	for s in _ground_specks:
 		draw_rect(s[0], s[1])
 	for r in ruins:

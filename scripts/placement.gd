@@ -21,9 +21,9 @@ func _process(_delta: float) -> void:
 		return
 	var p = game.player
 	if p.using_controller:
-		global_position = game.snap(p.global_position + p.aim_dir * 80.0)
+		global_position = game.snap_for(game.placing, p.global_position + p.aim_dir * 80.0)
 	else:
-		global_position = game.snap(get_global_mouse_position())
+		global_position = game.snap_for(game.placing, get_global_mouse_position())
 	# Browser: R2 does not arrive as a normal input event (see player.gd), so check it here.
 	var r2_down: bool = p.web_r2 > 0.5
 	if r2_down and not _web_r2_was_down and is_valid():

@@ -16,9 +16,9 @@ const BulletScript := preload("res://scripts/bullet.gd")
 const LAYER_DOOR := 16   # only zombies bump into doors; the player walks through
 
 const SIZES := {
-	"chest": Vector2(40, 28),
-	"workbench": Vector2(60, 36),
-	"campfire": Vector2(34, 34),
+	"chest": Vector2(32, 32),        # one grid square
+	"workbench": Vector2(64, 32),    # two grid squares
+	"campfire": Vector2(32, 32),
 	"wood_wall": Vector2(32, 32),
 	"stone_wall": Vector2(32, 32),
 	"door": Vector2(32, 32),

@@ -95,6 +95,20 @@ func _run() -> void:
 	check(game.ruins.size() > 10, "ruins were generated (%d)" % game.ruins.size())
 	check(get_nodes_in_group("crates").size() >= 30, "crates were placed")
 	check(game.nav != null, "zombie navigation grid is built")
+	var on_grid := true
+	for res in get_nodes_in_group("resources"):
+		on_grid = on_grid and fposmod(res.position.x, 32.0) == 16.0 and fposmod(res.position.y, 32.0) == 16.0
+	check(on_grid, "trees, rocks and scrap sit on the grid")
+	var crates_on_grid := true
+	for c in get_nodes_in_group("crates"):
+		crates_on_grid = crates_on_grid and fposmod(c.position.x, 32.0) == 16.0 and fposmod(c.position.y, 32.0) == 16.0
+	check(crates_on_grid, "crates sit on the grid")
+	var ruins_on_grid := true
+	for r in game.ruins:
+		for v in [r.position.x, r.position.y, r.size.x, r.size.y]:
+			ruins_on_grid = ruins_on_grid and fposmod(v, 32.0) == 0.0
+	check(ruins_on_grid, "ruined buildings line up with the grid")
+	check(game.campfire() == null, "there is no campfire at the start")
 	var actions := ["move_up", "move_down", "move_left", "move_right", "shoot", "melee", "dodge", "ability", "reload", "interact", "eat", "restart"]
 	var all_actions := true
 	for a in actions:
@@ -191,6 +205,8 @@ func _run() -> void:
 	var before: int = p.ammo_reserve + p.food
 	check(p.interact(), "searching a nearby crate works")
 	check(crate.opened, "crate is marked as opened")
+	await frames(1)
+	check(not is_instance_valid(crate), "a searched crate disappears")
 	check(p.ammo_reserve + p.food >= before, "loot was added")
 	check(not p.interact(), "an opened crate cannot be searched twice")
 
@@ -225,8 +241,12 @@ func _run() -> void:
 	game.phase_time = 100000.0
 	await frames(2)
 	check(not game.is_night, "daytime never ends on its own")
-	var fire = game.nearest_structure(game.WORLD_SIZE / 2 + game.CAMPFIRE_OFFSET, 5.0, "campfire")
-	check(fire != null, "there is a campfire at the start")
+	p.inventory.set_count("wood", 12)
+	p.inventory.set_count("stone", 8)
+	check(game.build_piece("campfire", p.position + Vector2(0, 96)), "build a campfire")
+	check(p.inventory.count("wood") == 6 and p.inventory.count("stone") == 4, "a campfire costs 6 wood and 4 stone")
+	check(not game.build_piece("campfire", p.position + Vector2(96, 96)), "only one campfire is allowed")
+	var fire = game.campfire()
 	for c in get_nodes_in_group("crates"):
 		if c.global_position.distance_to(fire.global_position) < 100:
 			c.queue_free()
@@ -257,6 +277,10 @@ func _run() -> void:
 	await frames(1)
 	check(game.zombie_count() == 0, "zombies vanish at dawn")
 	check(game.night_length() == 70.0, "the next night is longer")
+	p.inventory.set_count("wood", 0)
+	check(game.demolish_at(fire.global_position) and p.inventory.count("wood") == 6, "the campfire can be moved by day (full refund)")
+	await frames(1)
+	check(game.campfire() == null, "the campfire is gone after demolishing")
 	reset_player()
 
 	# --- inventory basics
@@ -306,9 +330,9 @@ func _run() -> void:
 	check(not p.can_craft("ammo"), "ammo needs a workbench")
 
 	# --- placing
-	var spot: Vector2 = game.snap(p.position + Vector2(0, -80))
+	var spot: Vector2 = game.snap_for("workbench", p.position + Vector2(0, -80))
 	check(game.can_place("workbench", spot), "free spot is placeable")
-	check(not game.can_place("workbench", game.snap(p.position)), "cannot place on top of yourself")
+	check(not game.can_place("workbench", game.snap_for("workbench", p.position)), "cannot place on top of yourself")
 	var ruin: Rect2 = game.ruins[0]
 	check(not game.can_place("chest", ruin.get_center()), "cannot place inside a ruin")
 	var built_count: int = get_nodes_in_group("structures").size()
@@ -321,7 +345,7 @@ func _run() -> void:
 	check(p.craft("medkit"), "craft a medkit at the workbench")
 
 	# --- chest storage
-	var chest_spot: Vector2 = game.snap(p.position + Vector2(-80, 0))
+	var chest_spot: Vector2 = game.snap_for("chest", p.position + Vector2(-80, 0))
 	check(p.place_structure("chest", chest_spot), "place the chest")
 	var chest = game.nearest_structure(chest_spot, 5.0, "chest")
 	check(chest != null and chest.storage != null, "chest has storage")
@@ -330,6 +354,15 @@ func _run() -> void:
 	check(inv.count("wood") == 0 and chest.storage.count("wood") == wood_now, "wood moved into the chest")
 	game.transfer(chest.storage, inv, "wood", wood_now)
 	check(inv.count("wood") == wood_now and chest.storage.is_empty(), "take wood back out")
+	var chest_ok: bool = fposmod(chest.position.x - 16.0, 32.0) == 0.0 and fposmod(chest.position.y - 16.0, 32.0) == 0.0
+	check(chest_ok, "a placed chest lines up with the grid")
+	inv.set_count("wood", 0)
+	inv.set_count("club", 0)
+	chest.storage.add("wood", 10)
+	check(p.nearby_chests().has(chest), "the workbench sees the nearby chest")
+	check(p.can_craft("club") and p.craft("club"), "craft at the workbench using wood from the chest")
+	check(chest.storage.count("wood") == 4 and inv.count("club") == 1, "the wood came out of the chest")
+	inv.set_count("wood", wood_now)
 
 	# --- healing
 	p.health = 50.0
@@ -501,7 +534,7 @@ func _run() -> void:
 	p.aim_dir = Vector2.RIGHT
 	game.start_placing("chest")
 	await frames(2)
-	check(game.placement.global_position == game.snap(p.global_position + Vector2(80, 0)), "placement sits in front of you on a controller")
+	check(game.placement.global_position == game.snap_for("chest", p.global_position + Vector2(80, 0)), "placement sits in front of you on a controller")
 	var built_before: int = get_nodes_in_group("structures").size()
 	joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)
 	await frames(2)
@@ -520,9 +553,9 @@ func _run() -> void:
 	# --- build mode (walls, doors, traps, towers)
 	reset_player()
 	await clear_zombies()
-	# Clear earlier test buildings (keep the campfire) and loot near the start.
+	# Clear earlier test buildings and loot near the start.
 	for st in get_nodes_in_group("structures"):
-		if st.kind != "campfire":
+		if true:
 			st.remove_from_group("structures")
 			st.queue_free()
 	for c in get_nodes_in_group("crates"):
@@ -644,7 +677,7 @@ func _run() -> void:
 	check(maze_intact, "zombies walk the maze to the base instead of breaking the maze")
 	await clear_zombies()
 	for st in get_nodes_in_group("structures"):
-		if st.kind != "campfire":
+		if true:
 			st.remove_from_group("structures")
 			st.queue_free()
 	game.nav_dirty = true
@@ -690,6 +723,39 @@ func _run() -> void:
 	game.nav_dirty = true
 	await frames(2)
 	check(game.nav.is_free(c0 + Vector2(-150, -40)), "a chopped tree frees the path")
+
+	# --- campfire siege (Maul style): zombies go for the campfire, 10 lives
+	reset_player()
+	await clear_zombies()
+	p.inventory.set_count("wood", 20)
+	p.inventory.set_count("stone", 20)
+	check(game.build_piece("campfire", p.position + Vector2(-96, 0)), "build the campfire for the siege test")
+	fire = game.campfire()
+	p.position = fire.global_position + Vector2(-400, 0)   # stand well away from it
+	await frames(1)
+	check(game.lives == game.CAMPFIRE_LIVES, "you start with 10 campfire lives")
+	z = game.spawn_zombie(fire.global_position + Vector2(300, 0), true)
+	await frames(2)
+	check(z.state == "siege", "horde zombies head for the campfire")
+	var hit_fire := false
+	for i in 900:
+		await physics_frame
+		if game.lives < game.CAMPFIRE_LIVES:
+			hit_fire = true
+			break
+	check(hit_fire and game.lives == game.CAMPFIRE_LIVES - 1, "a zombie reaching the campfire costs one life")
+	await frames(1)
+	check(not is_instance_valid(z), "that zombie is gone afterwards")
+	game.lives = 1
+	z = game.spawn_zombie(fire.global_position + Vector2(60, 0), true)
+	for i in 300:
+		await physics_frame
+		if game.game_over:
+			break
+	check(game.game_over and game.lives == 0 and "campfire" in game.lose_reason, "losing all campfire lives ends the game")
+	game.game_over = false
+	game.lose_reason = ""
+	await clear_zombies()
 
 	# --- death
 	reset_player()

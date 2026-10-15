@@ -115,6 +115,8 @@ func refresh(force: bool = false) -> void:
 		+ str(int(p.health)) + str(int(p.hunger)) + str(p.using_controller)
 	if chest != null:
 		sig += chest.storage.signature()
+	for c in p.nearby_chests():
+		sig += c.storage.signature()
 	if not force and sig == _last_signature:
 		return
 	_last_signature = sig
@@ -195,8 +197,12 @@ func _build_chest() -> void:
 
 func _build_crafting(p) -> void:
 	_side.add_child(_title("Crafting"))
-	var bench_txt := "Workbench nearby - all recipes unlocked" if p.near_workbench() \
-		else "No workbench nearby - [bench] recipes locked"
+	var bench_txt := "No workbench nearby - [bench] recipes locked"
+	if p.near_workbench():
+		var n: int = p.nearby_chests().size()
+		bench_txt = "Workbench nearby - all recipes unlocked"
+		if n > 0:
+			bench_txt += "\nAlso using items from %d nearby chest%s" % [n, "" if n == 1 else "s"]
 	_side.add_child(_small(bench_txt))
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(370, 400)

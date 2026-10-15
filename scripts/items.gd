@@ -14,7 +14,6 @@ const DATA := {
 	"arrow":     {"name": "Arrows",      "stack": 50,  "color": Color(0.85, 0.75, 0.55)},
 	"workbench": {"name": "Workbench",   "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
 	"chest":     {"name": "Chest",       "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
-	"campfire":  {"name": "Campfire",    "stack": 5,   "color": Color(1.0, 0.7, 0.4), "placeable": true},
 	# Weapons (one per slot).
 	"pistol":      {"name": "Pistol",      "stack": 1, "color": Color(0.55, 0.75, 1.0), "weapon": true},
 	"bow":         {"name": "Bow",         "stack": 1, "color": Color(0.55, 0.75, 1.0), "weapon": true},
@@ -28,7 +27,7 @@ const DATA := {
 
 ## The order items are listed in the inventory.
 const ORDER := ["pistol", "bow", "crossbow", "club", "stone_axe", "spear", "spiked_club", "machete",
-	"ammo", "arrow", "food", "bandage", "medkit", "wood", "stone", "scrap", "cloth", "campfire", "workbench", "chest"]
+	"ammo", "arrow", "food", "bandage", "medkit", "wood", "stone", "scrap", "cloth", "workbench", "chest"]
 
 ## Weapon stats.
 ## Melee:  damage, range (pixels), arc (radians each side, small = narrow thrust),
@@ -49,7 +48,6 @@ const WEAPONS := {
 
 ## bench = true means you must stand near a placed workbench to craft it.
 const RECIPES := [
-	{"id": "campfire",    "amount": 1, "cost": {"wood": 6, "stone": 4},             "bench": false},
 	{"id": "workbench",   "amount": 1, "cost": {"wood": 10, "stone": 4},            "bench": false},
 	{"id": "chest",       "amount": 1, "cost": {"wood": 12},                        "bench": false},
 	{"id": "bandage",     "amount": 1, "cost": {"cloth": 2},                        "bench": false},

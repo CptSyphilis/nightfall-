@@ -62,8 +62,12 @@ func _draw() -> void:
 		_text(Vector2(w - 260, 60), "Survive until dawn", 14, Color(1, 1, 1, 0.75))
 	else:
 		_text(Vector2(w - 260, 34), "Day %d" % game.day, 22, Color(1, 0.95, 0.7))
-		_text(Vector2(w - 260, 60), "Campfire starts the night", 14, Color(1, 1, 1, 0.75))
+		var tip := "Use the campfire to start the night" if game.campfire() != null \
+			else "Build a campfire (%s) to start the night" % prompt("build")
+		_text(Vector2(w - 260, 60), tip, 14, Color(1, 1, 1, 0.75))
 	_text(Vector2(w - 260, 84), "Kills %d" % game.kills)
+	var lives_color := Color(1, 0.45, 0.35) if game.lives <= 3 else Color(1, 0.8, 0.5)
+	_text(Vector2(w - 260, 108), "Campfire lives  %d / %d" % [game.lives, game.CAMPFIRE_LIVES], 16, lives_color)
 
 	# Prompt when standing next to something you can use.
 	if not p.dead and not game.ui_open:
@@ -99,7 +103,8 @@ func _draw() -> void:
 
 	if game.game_over:
 		draw_rect(Rect2(0, 0, w, h), Color(0, 0, 0, 0.65))
-		_text_centered(h / 2 - 30, "YOU DIED", 48, Color(0.9, 0.2, 0.2))
+		_text_centered(h / 2 - 70, game.lose_reason, 22, Color(1, 0.8, 0.7))
+		_text_centered(h / 2 - 30, "GAME OVER", 48, Color(0.9, 0.2, 0.2))
 		_text_centered(h / 2 + 15, "Survived to day %d with %d kills" % [game.day, game.kills], 20)
 		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
 

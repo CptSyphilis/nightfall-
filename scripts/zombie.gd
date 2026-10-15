@@ -5,7 +5,10 @@ extends CharacterBody2D
 ##   wander      - shuffles around slowly
 ##   investigate - walks to a noise it heard (noise goes through walls)
 ##   chase       - saw you, comes for you (sight is blocked by walls)
-## Horde zombies always know where you are and always chase.
+##   siege       - horde zombie heading for your campfire (Maul style).
+##                 Reaching it costs you a life, and the zombie is gone.
+## Horde zombies go for the campfire, but turn on you if you get close.
+## With no campfire they always know where you are and chase you.
 ##
 ## How it moves:
 ##   If nothing is in the way, it walks straight at its goal.
@@ -122,6 +125,16 @@ func _physics_process(delta: float) -> void:
 		"chase":
 			goal = player.global_position
 			has_goal = true
+		"siege":
+			var fire: Node2D = game.campfire() if game != null else null
+			if fire == null:
+				state = "chase" if player_alive else "wander"
+			else:
+				goal = fire.global_position
+				has_goal = true
+				if global_position.distance_to(goal) < 16.0 + radius + 14.0:
+					game.campfire_hit(self)
+					return
 		"investigate":
 			investigate_timer -= delta
 			goal = target_pos
@@ -173,7 +186,11 @@ func _update_sight(delta: float, dist: float) -> void:
 	if _sight_timer <= 0.0:
 		_sight_timer = SIGHT_CHECK_TIME
 		_sees_player = dist < view and clear_line(global_position, player.global_position, false)
-	if is_horde or _sees_player:
+	var fire: Node2D = game.campfire() if game != null else null
+	if is_horde and fire != null and not (_sees_player and dist < 140.0):
+		state = "siege"
+		_unseen_time = 0.0
+	elif is_horde or _sees_player:
 		state = "chase"
 		_unseen_time = 0.0
 	elif state == "chase":
@@ -185,7 +202,7 @@ func _update_sight(delta: float, dist: float) -> void:
 
 ## Something made noise at pos. Go look, unless already chasing a visible player.
 func hear(pos: Vector2) -> void:
-	if state == "chase" and (is_horde or _sees_player):
+	if state == "siege" or (state == "chase" and (is_horde or _sees_player)):
 		return
 	state = "investigate"
 	target_pos = pos

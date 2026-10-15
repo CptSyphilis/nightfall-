@@ -8,6 +8,7 @@ extends RefCounted
 ## To add a piece: add it to PIECES and ORDER, then give it a look in structure.gd.
 
 const PIECES := {
+	"campfire":   {"name": "Campfire",    "cost": {"wood": 6, "stone": 4},             "hp": 1.0},
 	"wood_wall":  {"name": "Wood wall",   "cost": {"wood": 2},                         "hp": 120.0},
 	"stone_wall": {"name": "Stone wall",  "cost": {"stone": 2, "wood": 1},             "hp": 350.0},
 	"door":       {"name": "Door",        "cost": {"wood": 4, "scrap": 1},             "hp": 160.0},
@@ -15,10 +16,11 @@ const PIECES := {
 	"tower":      {"name": "Arrow tower", "cost": {"wood": 10, "stone": 6, "scrap": 3}, "hp": 300.0},
 }
 
-const ORDER := ["wood_wall", "stone_wall", "door", "spikes", "tower"]
+const ORDER := ["campfire", "wood_wall", "stone_wall", "door", "spikes", "tower"]
 
 ## What each piece does, shown in build mode.
 const INFO := {
+	"campfire": "Starts the night. Defend it! Only one",
 	"wood_wall": "Cheap wall for mazes",
 	"stone_wall": "Tough wall",
 	"door": "You walk through, zombies don't",
