@@ -14,6 +14,9 @@ const DATA := {
 	"arrow":     {"name": "Arrows",      "stack": 50,  "color": Color(0.85, 0.75, 0.55)},
 	"workbench": {"name": "Workbench",   "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
 	"chest":     {"name": "Chest",       "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
+	# Backpack upgrades are used up right away: they give you more inventory slots.
+	"backpack_medium": {"name": "Medium backpack", "stack": 1, "color": Color(0.7, 0.6, 0.45)},
+	"backpack_large":  {"name": "Large backpack",  "stack": 1, "color": Color(0.7, 0.6, 0.45)},
 	# Weapons (one per slot).
 	"pistol":      {"name": "Pistol",      "stack": 1, "color": Color(0.55, 0.75, 1.0), "weapon": true},
 	"bow":         {"name": "Bow",         "stack": 1, "color": Color(0.55, 0.75, 1.0), "weapon": true},
@@ -47,7 +50,11 @@ const WEAPONS := {
 }
 
 ## bench = true means you must stand near a placed workbench to craft it.
+## slots = a backpack upgrade: crafting it sets your inventory to that many slots.
+##         from_slots = the backpack you need first (upgrades go in order).
 const RECIPES := [
+	{"id": "backpack_medium", "amount": 1, "cost": {"cloth": 8, "wood": 2},     "bench": false, "slots": 20, "from_slots": 16},
+	{"id": "backpack_large",  "amount": 1, "cost": {"cloth": 12, "scrap": 4},   "bench": true,  "slots": 24, "from_slots": 20},
 	{"id": "workbench",   "amount": 1, "cost": {"wood": 10, "stone": 4},            "bench": false},
 	{"id": "chest",       "amount": 1, "cost": {"wood": 12},                        "bench": false},
 	{"id": "bandage",     "amount": 1, "cost": {"cloth": 2},                        "bench": false},

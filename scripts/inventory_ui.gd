@@ -279,6 +279,10 @@ func _recipe_button(r: Dictionary) -> Button:
 	var text := "%s   -   %s" % [name, Items.describe_cost(r["cost"])]
 	if r["bench"]:
 		text += "   [bench]"
+	if r.has("slots"):
+		text += "   (%d slots)" % r["slots"]
+		if game.player.inventory.max_slots >= r["slots"]:
+			text = "%s   -   wearing it" % name
 	var b := _button(text)
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.custom_minimum_size = Vector2(350, 30)

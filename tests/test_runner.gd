@@ -774,6 +774,24 @@ func _run() -> void:
 	check(totals.get("arrow", 0) / 2000.0 < 0.4, "arrows are rarer (%.2f per crate)" % (totals.get("arrow", 0) / 2000.0))
 	check(game.ZOMBIE_DROP_CHANCE <= 0.1, "zombies drop bags less often")
 
+	# --- backpack upgrades
+	reset_player()
+	p.inventory.max_slots = 16
+	p.inventory.set_count("cloth", 30)
+	p.inventory.set_count("wood", 5)
+	p.inventory.set_count("scrap", 5)
+	check(not p.can_craft("backpack_large"), "large backpack needs the medium one first")
+	check(p.craft("backpack_medium") and p.inventory.max_slots == 20, "medium backpack gives 20 slots")
+	check(p.inventory.count("backpack_medium") == 0, "the backpack is worn, not kept in the bag")
+	check(not p.can_craft("backpack_medium"), "cannot craft the medium backpack twice")
+	var bench2 = game.spawn_structure("workbench", p.position + Vector2(48, 0))
+	check(p.craft("backpack_large") and p.inventory.max_slots == 24, "large backpack gives 24 slots")
+	bench2.queue_free()
+	p.inventory.max_slots = 16
+	for id in ["cloth", "wood", "scrap"]:
+		p.inventory.set_count(id, 0)
+	await frames(1)
+
 	# --- death
 	reset_player()
 	p.take_damage(1000)

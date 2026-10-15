@@ -577,6 +577,8 @@ func can_craft(id: String) -> bool:
 		return false
 	if not can_afford(r["cost"]):
 		return false
+	if r.has("slots"):
+		return inventory.max_slots == r["from_slots"]   # upgrades go in order
 	return inventory.space_for(id) >= r["amount"]
 
 
@@ -585,7 +587,10 @@ func craft(id: String) -> bool:
 		return false
 	var r: Dictionary = Items.recipe(id)
 	pay(r["cost"])
-	inventory.add(id, r["amount"])
+	if r.has("slots"):
+		inventory.max_slots = r["slots"]   # backpacks are worn right away
+	else:
+		inventory.add(id, r["amount"])
 	game.floating_text(global_position + Vector2(0, -30), "Crafted %s" % Items.display_name(id), Color(0.6, 1, 0.6))
 	return true
 
