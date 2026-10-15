@@ -90,7 +90,7 @@ func _draw() -> void:
 	# Big message at the top.
 	if _message_time > 0.0:
 		var a := clampf(_message_time, 0.0, 1.0)
-		_text_centered(110, _message, 24, Color(1, 1, 1, a))
+		_text_centered(110, _message, 20, Color(1, 1, 1, a))   # smaller so it never runs into the corner text
 
 	if game.show_input_debug:
 		_draw_input_debug(p)
