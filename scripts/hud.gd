@@ -46,6 +46,9 @@ func _draw() -> void:
 	var w := size.x
 	var h := size.y
 
+	if not p.dead and not game.game_over:
+		_draw_danger_border(p, w, h)
+
 	# Left: survival stats.
 	_bar(Vector2(20, 20), "Health", p.health / p.max_health, Color(0.8, 0.2, 0.2))
 	_bar(Vector2(20, 50), "Hunger", p.hunger / 100.0, Color(0.85, 0.6, 0.2))
@@ -109,6 +112,31 @@ func _draw() -> void:
 		_text_centered(h / 2 - 30, "GAME OVER", 48, Color(0.9, 0.2, 0.2))
 		_text_centered(h / 2 + 15, "Survived to day %d with %d kills" % [game.day, game.kills], 20)
 		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
+
+
+## A red glow around the screen edge that pulses when health is low or you are
+## starving, faster and stronger the worse it gets, and flashes when you get hit.
+func _draw_danger_border(p, w: float, h: float) -> void:
+	var danger := 0.0
+	var low_health: float = p.max_health * 0.35
+	if p.health < low_health:
+		danger = 0.4 + 0.6 * (1.0 - p.health / low_health)
+	if p.hunger < 20.0:
+		danger = maxf(danger, 0.3 + 0.5 * (1.0 - p.hunger / 20.0))   # 0.8 once starving
+	var t := Time.get_ticks_msec() / 1000.0
+	var pulse := 0.55 + 0.45 * sin(t * (4.0 + 5.0 * danger))
+	var a := danger * pulse * 0.55
+	a = maxf(a, p.hurt_flash / 0.2 * 0.5)   # a quick flash on every hit
+	if a <= 0.01:
+		return
+	var edge := Color(0.85, 0.05, 0.05, a)
+	var clear := Color(0.85, 0.05, 0.05, 0.0)
+	var d := minf(w, h) * 0.12   # how far the glow reaches in
+	var o := [Vector2(0, 0), Vector2(w, 0), Vector2(w, h), Vector2(0, h)]
+	var i := [Vector2(d, d), Vector2(w - d, d), Vector2(w - d, h - d), Vector2(d, h - d)]
+	for k in 4:
+		var n := (k + 1) % 4
+		draw_polygon(PackedVector2Array([o[k], o[n], i[n], i[k]]), PackedColorArray([edge, edge, clear, clear]))
 
 
 ## An arrow at the edge of the screen pointing to the campfire when you can't see it.
