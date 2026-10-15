@@ -14,6 +14,8 @@ var _inv: VBoxContainer
 var _side: VBoxContainer
 var _last_signature := ""
 var _focus_key := ""     # which button had controller focus, kept across rebuilds
+var _craft_scroll: ScrollContainer = null
+var _craft_scroll_y := 0  # how far the crafting list was scrolled, kept across rebuilds
 var discard_mode := false   # when on, selecting an item throws it away
 
 
@@ -128,6 +130,8 @@ func refresh(force: bool = false) -> void:
 	var focused := get_viewport().gui_get_focus_owner()
 	if focused != null and focused.has_meta("key"):
 		_focus_key = focused.get_meta("key")
+	if is_instance_valid(_craft_scroll):
+		_craft_scroll_y = _craft_scroll.scroll_vertical
 
 	for box in [_char, _inv, _side]:
 		for child in box.get_children():
@@ -172,6 +176,10 @@ func _build_character(p) -> void:
 	_char.add_child(_stat("Hunger", "%d%%" % p.hunger))
 	_char.add_child(_stat("Melee damage", "%d" % m["damage"]))
 	_char.add_child(_stat("Melee reach", "%d" % m["range"]))
+	var g: Dictionary = m.get("gather", {})
+	_char.add_child(_stat("Wood gathering", "%sx" % g.get("tree", 1.0)))
+	_char.add_child(_stat("Stone gathering", "%sx" % g.get("rock", 1.0)))
+	_char.add_child(_stat("Scrap gathering", "%sx" % g.get("scrap", 1.0)))
 	if r.is_empty():
 		_char.add_child(_stat("Ranged damage", "-"))
 	else:
@@ -229,6 +237,15 @@ func _build_crafting(p) -> void:
 		list.add_child(_recipe_button(r))
 	_side.add_child(scroll)
 	_side.add_child(_small(_close_hint()))
+	_craft_scroll = scroll
+	_restore_scroll(scroll, _craft_scroll_y)
+
+
+## The new list can't scroll until it has been laid out, so wait a frame.
+func _restore_scroll(scroll: ScrollContainer, y: int) -> void:
+	await get_tree().process_frame
+	if is_instance_valid(scroll):
+		scroll.scroll_vertical = y
 
 
 func _item_grid(inv, on_click: Callable, p) -> Control:

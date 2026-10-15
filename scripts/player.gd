@@ -405,7 +405,7 @@ func melee() -> bool:
 		z.take_damage(w["damage"], to.normalized() * w["knockback"])
 		hits += 1
 	# The same swing chops trees, breaks rocks and pulls apart scrap.
-	var gather_bonus: Dictionary = w.get("gather", {})
+	var gather_power: Dictionary = w.get("gather", {})
 	for r in get_tree().get_nodes_in_group("resources"):
 		if r.depleted:
 			continue
@@ -414,7 +414,7 @@ func melee() -> bool:
 			continue
 		if absf(aim_dir.angle_to(to)) > arc + _arc_slack(to.length(), r.radius):
 			continue
-		r.gather(self, gather_bonus.get(r.kind, 1))
+		r.gather(self, gather_power.get(r.kind, 1.0))
 		hits += 1
 	game.make_noise(global_position, MELEE_NOISE)
 	return hits > 0

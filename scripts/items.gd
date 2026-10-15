@@ -35,16 +35,17 @@ const ORDER := ["pistol", "bow", "crossbow", "club", "stone_axe", "spear", "spik
 
 ## Weapon stats.
 ## Melee:  damage, range (pixels), arc (radians each side, small = narrow thrust),
-##         cooldown (seconds between swings), knockback, gather (bonus per resource type).
+##         cooldown (seconds between swings), knockback,
+##         gather (power on tree / rock / scrap: 1 = normal, higher = more per swing and fewer swings).
 ## Ranged: damage, cooldown, ammo (item used), magazine (0 = no reloading),
 ##         noise (how far zombies hear it), speed and life of the projectile.
 const WEAPONS := {
-	"fists":       {"type": "melee", "damage": 18.0, "range": 50.0,  "arc": 0.9,  "cooldown": 0.40, "knockback": 200.0},
-	"club":        {"type": "melee", "damage": 38.0, "range": 70.0,  "arc": 1.2,  "cooldown": 0.55, "knockback": 450.0},
-	"stone_axe":   {"type": "melee", "damage": 30.0, "range": 65.0,  "arc": 1.0,  "cooldown": 0.50, "knockback": 300.0, "gather": {"tree": 2}},
-	"spear":       {"type": "melee", "damage": 45.0, "range": 115.0, "arc": 0.3,  "cooldown": 0.60, "knockback": 250.0},
-	"spiked_club": {"type": "melee", "damage": 60.0, "range": 72.0,  "arc": 1.2,  "cooldown": 0.60, "knockback": 550.0},
-	"machete":     {"type": "melee", "damage": 45.0, "range": 72.0,  "arc": 1.3,  "cooldown": 0.38, "knockback": 220.0, "gather": {"scrap": 2}},
+	"fists":       {"type": "melee", "damage": 18.0, "range": 50.0,  "arc": 0.9,  "cooldown": 0.40, "knockback": 200.0, "gather": {"tree": 0.5, "rock": 0.25, "scrap": 0.5}},
+	"club":        {"type": "melee", "damage": 38.0, "range": 70.0,  "arc": 1.2,  "cooldown": 0.55, "knockback": 450.0, "gather": {"tree": 1.0, "rock": 1.5, "scrap": 1.0}},
+	"stone_axe":   {"type": "melee", "damage": 30.0, "range": 65.0,  "arc": 1.0,  "cooldown": 0.50, "knockback": 300.0, "gather": {"tree": 2.5, "rock": 1.0, "scrap": 1.0}},
+	"spear":       {"type": "melee", "damage": 45.0, "range": 115.0, "arc": 0.3,  "cooldown": 0.60, "knockback": 250.0, "gather": {"tree": 0.75, "rock": 0.5, "scrap": 0.75}},
+	"spiked_club": {"type": "melee", "damage": 60.0, "range": 72.0,  "arc": 1.2,  "cooldown": 0.60, "knockback": 550.0, "gather": {"tree": 1.0, "rock": 2.5, "scrap": 1.5}},
+	"machete":     {"type": "melee", "damage": 45.0, "range": 72.0,  "arc": 1.3,  "cooldown": 0.38, "knockback": 220.0, "gather": {"tree": 1.5, "rock": 0.5, "scrap": 2.5}},
 	"pistol":   {"type": "ranged", "damage": 45.0, "cooldown": 0.18, "ammo": "ammo",  "magazine": 12, "noise": 650.0, "speed": 1100.0, "life": 0.8, "style": "bullet"},
 	"bow":      {"type": "ranged", "damage": 55.0, "cooldown": 0.75, "ammo": "arrow", "magazine": 0,  "noise": 90.0,  "speed": 700.0,  "life": 0.9, "style": "arrow"},
 	"crossbow": {"type": "ranged", "damage": 95.0, "cooldown": 1.40, "ammo": "arrow", "magazine": 0,  "noise": 140.0, "speed": 950.0,  "life": 0.9, "style": "arrow"},
