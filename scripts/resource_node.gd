@@ -63,6 +63,9 @@ func gather(by: Node, multiplier: int = 1) -> int:
 	_shake = 0.15
 	if hits_left <= 0:
 		depleted = true
+		var game := get_tree().get_first_node_in_group("game")
+		if game:
+			game.nav_dirty = true   # zombies can walk here now
 		queue_free()
 	return added
 

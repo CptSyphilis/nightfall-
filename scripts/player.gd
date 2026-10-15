@@ -455,10 +455,13 @@ func interact() -> bool:
 		return _search_crate(crate)
 	var s: Node2D = game.nearest_structure(global_position, 64.0)
 	if s != null:
-		if s.kind == "chest":
-			game.ui.open_chest(s)
-		else:
-			game.ui.open()
+		match s.kind:
+			"chest":
+				game.ui.open_chest(s)
+			"campfire":
+				game.campfire_used()
+			_:
+				game.ui.open()
 		return true
 	return false
 

@@ -2,11 +2,15 @@ extends Node2D
 ## Main game scene.
 ## Builds the map, runs the day/night cycle and spawns zombies.
 ## Everything is created from code, so there is only one tiny .tscn file.
+##
+## The loop:
+##   Day   - no zombies and no timer. Gather, craft and build.
+##   Night - starts when you use a campfire. Zombies hunt you until dawn.
+##   Dawn  - the zombies are gone and a new day begins.
 
 const WORLD_SIZE := Vector2(3200, 3200)
-const DAY_LENGTH := 90.0     # seconds of daylight
-const NIGHT_LENGTH := 60.0   # seconds of night (horde time)
 const SAFE_RADIUS := 320.0   # nothing spawns this close to the start point
+const CAMPFIRE_OFFSET := Vector2(-90, 90)   # where the starting campfire sits
 
 const PlayerScript := preload("res://scripts/player.gd")
 const ZombieScript := preload("res://scripts/zombie.gd")
@@ -17,6 +21,7 @@ const StructureScript := preload("res://scripts/structure.gd")
 const InventoryUiScript := preload("res://scripts/inventory_ui.gd")
 const PlacementScript := preload("res://scripts/placement.gd")
 const FloatingTextScript := preload("res://scripts/floating_text.gd")
+const NavGridScript := preload("res://scripts/nav_grid.gd")
 
 const DAY_COLOR := Color(1, 1, 1)
 const NIGHT_COLOR := Color(0.28, 0.32, 0.5)
@@ -46,6 +51,9 @@ var spawning_enabled := true
 var trickle_timer := 0.0
 var horde_left := 0
 var horde_timer := 0.0
+var nav = null              # navigation grid zombies use to walk around things
+var nav_dirty := false      # rebuild the grid (something was built or chopped down)
+var _night_confirm_until := 0   # campfire needs a second press within 3 seconds
 
 var ruins: Array[Rect2] = []
 var rng := RandomNumberGenerator.new()
@@ -61,21 +69,23 @@ func _ready() -> void:
 	_spawn_hud()
 	_spawn_crates()
 	_spawn_resources()
-	for i in 12:
-		spawn_zombie(_random_spawn_point(500, 1300), false)
-	hud.show_message("Day 1 - gather wood and stone, then open the character screen to craft", 5.0)
+	spawn_structure("campfire", WORLD_SIZE / 2 + CAMPFIRE_OFFSET)
+	nav = NavGridScript.new()
+	nav.build(WORLD_SIZE, ruins, self)
+	hud.show_message("Day 1 - gather and build. Use the campfire when you are ready for the night.", 6.0)
 
 
 func _physics_process(delta: float) -> void:
+	if nav_dirty and nav != null:
+		nav_dirty = false
+		nav.build(WORLD_SIZE, ruins, self)
 	if game_over:
 		return
 	phase_time += delta
-	if not is_night and phase_time >= DAY_LENGTH:
-		start_night()
-	elif is_night and phase_time >= NIGHT_LENGTH:
+	if is_night and phase_time >= night_length():
 		start_day()
 	_update_tint()
-	if spawning_enabled:
+	if spawning_enabled and is_night:
 		_update_spawning(delta)
 
 
@@ -88,12 +98,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ---------------------------------------------------------------- day / night
 
-func start_night() -> void:
+## Nights get longer: 60 seconds on night 1, +10 each night, at most 2 minutes.
+func night_length() -> float:
+	return minf(60.0 + (day - 1) * 10.0, 120.0)
+
+
+## Called when the player uses a campfire. The first press asks to confirm,
+## a second press within 3 seconds starts the night.
+func campfire_used() -> void:
+	if is_night:
+		hud.show_message("The fire is burning. Survive until dawn.", 2.5)
+		return
+	var now := Time.get_ticks_msec()
+	if now < _night_confirm_until:
+		_night_confirm_until = 0
+		start_night()
+	else:
+		_night_confirm_until = now + 3000
+		hud.show_message("Press %s again to start night %d" % [hud.prompt("interact"), day], 3.0)
+
+
+func start_night() -> bool:
+	if is_night:
+		return false
 	is_night = true
 	phase_time = 0.0
 	horde_left = 4 + day * 4
 	horde_timer = 3.0
+	trickle_timer = 1.0
 	hud.show_message("Night %d - the horde is coming" % day)
+	return true
 
 
 func start_day() -> void:
@@ -101,33 +135,36 @@ func start_day() -> void:
 	phase_time = 0.0
 	day += 1
 	horde_left = 0
+	# The dead do not walk in daylight.
 	for z in get_tree().get_nodes_in_group("zombies"):
-		z.is_horde = false
-	hud.show_message("Day %d - you survived the night" % day)
+		z.dead = true
+		z.queue_free()
+	hud.show_message("Day %d - you survived the night. Build and gather." % day, 4.0)
 
 
+## Seconds left of the night (0 during the day).
 func time_left() -> float:
-	return (NIGHT_LENGTH if is_night else DAY_LENGTH) - phase_time
+	return night_length() - phase_time if is_night else 0.0
 
 
 func _update_tint() -> void:
-	# 0 = full daylight, 1 = full night. Fades over the last few seconds.
+	# 0 = full daylight, 1 = full night.
+	# Darkens over 3 seconds after the fire is lit, brightens over the last 8 seconds.
 	var t := 0.0
 	if is_night:
-		t = clampf((NIGHT_LENGTH - phase_time) / 8.0, 0.0, 1.0)
-	else:
-		t = clampf((phase_time - (DAY_LENGTH - 10.0)) / 10.0, 0.0, 1.0)
+		t = minf(clampf(phase_time / 3.0, 0.0, 1.0), clampf((night_length() - phase_time) / 8.0, 0.0, 1.0))
 	night_amount = t
 	tint.color = DAY_COLOR.lerp(NIGHT_COLOR, t)
 
 
 # ---------------------------------------------------------------- spawning
 
+## Only runs at night.
 func _update_spawning(delta: float) -> void:
-	# A slow trickle of wanderers all the time.
+	# Wanderers keep shuffling in from the dark.
 	trickle_timer -= delta
 	if trickle_timer <= 0.0:
-		trickle_timer = 2.5 if is_night else 4.0
+		trickle_timer = 2.5
 		if zombie_count() < 12 + day * 3:
 			spawn_zombie(_random_spawn_point(600, 1100), false)
 	# At night, horde zombies arrive one by one and head straight for you.
@@ -164,7 +201,7 @@ func _random_spawn_point(min_d: float, max_d: float) -> Vector2:
 	for i in 20:
 		var p := origin + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(min_d, max_d)
 		p = p.clamp(Vector2(40, 40), WORLD_SIZE - Vector2(40, 40))
-		if point_is_free(p) and p.distance_to(origin) > min_d * 0.6:
+		if point_is_free(p) and (nav == null or nav.is_free(p)) and p.distance_to(origin) > min_d * 0.6:
 			return p
 	return (origin + Vector2(max_d, 0)).clamp(Vector2(40, 40), WORLD_SIZE - Vector2(40, 40))
 
@@ -181,6 +218,7 @@ func spawn_resource(kind: String, pos: Vector2) -> StaticBody2D:
 	node.position = pos
 	node.setup(kind)
 	items_node.add_child(node)
+	nav_dirty = true    # zombies need to walk around it
 	return node
 
 
@@ -189,7 +227,17 @@ func spawn_structure(kind: String, pos: Vector2) -> StaticBody2D:
 	s.position = pos
 	s.setup(kind)
 	items_node.add_child(s)
+	nav_dirty = true    # zombies need to walk around it
 	return s
+
+
+## Adds a solid wall (used for ruins, and by the tests).
+func add_wall(rect: Rect2) -> void:
+	ruins.append(rect)
+	_make_wall(rect)
+	queue_redraw()
+	if nav != null:
+		nav.build(WORLD_SIZE, ruins, self)
 
 
 func floating_text(pos: Vector2, text: String, color: Color = Color.WHITE) -> void:

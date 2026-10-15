@@ -94,7 +94,7 @@ func _run() -> void:
 	check(p != null, "player exists")
 	check(game.ruins.size() > 10, "ruins were generated (%d)" % game.ruins.size())
 	check(get_nodes_in_group("crates").size() >= 30, "crates were placed")
-	check(game.zombie_count() >= 10, "starting zombies spawned")
+	check(game.nav != null, "zombie navigation grid is built")
 	var actions := ["move_up", "move_down", "move_left", "move_right", "shoot", "melee", "dodge", "ability", "reload", "interact", "eat", "restart"]
 	var all_actions := true
 	for a in actions:
@@ -219,13 +219,28 @@ func _run() -> void:
 	check(not p.shockwave(), "shockwave has a cooldown")
 	await clear_zombies()
 
-	# --- day / night cycle
+	# --- day / night cycle (campfire starts the night)
 	reset_player()
-	game.phase_time = game.DAY_LENGTH - 0.01
+	check(not game.is_night and game.zombie_count() == 0, "daytime has no zombies")
+	game.phase_time = 100000.0
 	await frames(2)
-	check(game.is_night, "day turns into night")
+	check(not game.is_night, "daytime never ends on its own")
+	var fire = game.nearest_structure(game.WORLD_SIZE / 2 + game.CAMPFIRE_OFFSET, 5.0, "campfire")
+	check(fire != null, "there is a campfire at the start")
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(fire.global_position) < 100:
+			c.queue_free()
+	await frames(1)
+	p.position = fire.global_position + Vector2(0, 45)
+	await frames(1)
+	check(p.interact() and not game.is_night, "first press at the campfire only asks to confirm")
+	p.interact()
+	check(game.is_night, "second press starts the night")
 	check(game.horde_left > 0, "a horde is queued for the night")
+	game.phase_time = 5.0
+	await frames(2)
 	check(game.tint.color.v < 0.8, "the screen gets darker at night")
+	check(fire.light.energy > 0.5, "the campfire glows at night")
 	game.spawning_enabled = true
 	game.horde_timer = 0.0
 	await frames(2)
@@ -235,14 +250,14 @@ func _run() -> void:
 		if hz.is_horde:
 			horde_found = true
 	check(horde_found, "horde zombies spawn at night")
-	game.phase_time = game.NIGHT_LENGTH - 0.01
+	check(game.night_length() == 60.0, "the first night lasts 60 seconds")
+	game.phase_time = game.night_length() - 0.01
 	await frames(2)
 	check(not game.is_night and game.day == 2, "surviving the night starts day 2")
-	var still_horde := false
-	for hz in get_nodes_in_group("zombies"):
-		still_horde = still_horde or hz.is_horde
-	check(not still_horde, "horde calms down at dawn")
-	await clear_zombies()
+	await frames(1)
+	check(game.zombie_count() == 0, "zombies vanish at dawn")
+	check(game.night_length() == 70.0, "the next night is longer")
+	reset_player()
 
 	# --- inventory basics
 	var Inv = load("res://scripts/inventory.gd")
@@ -296,8 +311,9 @@ func _run() -> void:
 	check(not game.can_place("workbench", game.snap(p.position)), "cannot place on top of yourself")
 	var ruin: Rect2 = game.ruins[0]
 	check(not game.can_place("chest", ruin.get_center()), "cannot place inside a ruin")
+	var built_count: int = get_nodes_in_group("structures").size()
 	check(p.place_structure("workbench", spot), "place the workbench")
-	check(inv.count("workbench") == 0 and get_nodes_in_group("structures").size() == 1, "workbench is now in the world")
+	check(inv.count("workbench") == 0 and get_nodes_in_group("structures").size() == built_count + 1, "workbench is now in the world")
 	check(not game.can_place("chest", spot), "cannot place two things in one spot")
 	check(p.near_workbench(), "player is near the workbench")
 	var ammo_before: int = p.ammo_reserve
@@ -500,6 +516,46 @@ func _run() -> void:
 	check(not p.using_controller and game.hud.prompt("interact") == "E", "moving the mouse switches back to mouse and keyboard")
 	p.controls_enabled = false
 	p.use_mouse_aim = false
+
+	# --- zombie pathing and sight
+	reset_player()
+	await clear_zombies()
+	var c0: Vector2 = p.position
+	game.add_wall(Rect2(c0 + Vector2(70, -160), Vector2(40, 320)))
+	await frames(1)
+	check(not game.nav.is_free(c0 + Vector2(90, 0)) and game.nav.is_free(c0 + Vector2(200, 0)), "walls are marked on the navigation grid")
+	var route: PackedVector2Array = game.nav.find_path(c0 + Vector2(220, 0), c0)
+	var route_ok := route.size() > 2
+	for pt in route:
+		if pt.x > c0.x + 56 and pt.x < c0.x + 124 and absf(pt.y - c0.y) < 174:
+			route_ok = false   # a path point inside the wall
+	check(route_ok, "a path goes around the wall, not through it")
+	z = game.spawn_zombie(c0 + Vector2(220, 0), true)   # horde zombies always hunt you
+	await frames(1)
+	var reached := false
+	for i in 600:
+		await physics_frame
+		if p.health < p.max_health:
+			reached = true
+			break
+	check(reached, "zombie walks around a wall to reach you")
+	await clear_zombies()
+	reset_player()
+	z = game.spawn_zombie(c0 + Vector2(200, 0), false)
+	await frames(30)
+	check(z.state == "wander", "zombie cannot see you through a wall")
+	game.make_noise(p.position, p.GUN_NOISE)
+	check(z.state == "investigate", "but it still hears you through the wall")
+	await clear_zombies()
+	reset_player()
+	var tree2 = game.spawn_resource("tree", c0 + Vector2(-150, -40))
+	await frames(2)
+	check(not game.nav.is_free(tree2.global_position), "trees block zombie paths")
+	tree2.depleted = true
+	tree2.queue_free()
+	game.nav_dirty = true
+	await frames(2)
+	check(game.nav.is_free(c0 + Vector2(-150, -40)), "a chopped tree frees the path")
 
 	# --- death
 	reset_player()

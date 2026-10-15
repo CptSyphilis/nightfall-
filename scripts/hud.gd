@@ -56,11 +56,13 @@ func _draw() -> void:
 	_text(Vector2(20, 196), "Wood %d   Stone %d   Scrap %d   Cloth %d" % [inv.count("wood"), inv.count("stone"), inv.count("scrap"), inv.count("cloth")], 14, Color(1, 1, 1, 0.75))
 
 	# Right: clock and kills.
-	var phase := "NIGHT" if game.is_night else "Day"
-	var clock := "%s %d   %ds" % [phase, game.day, int(ceil(game.time_left()))]
-	var clock_color := Color(0.6, 0.7, 1.0) if game.is_night else Color(1, 0.95, 0.7)
-	_text(Vector2(w - 260, 34), clock, 22, clock_color)
-	_text(Vector2(w - 260, 60), "Kills %d" % game.kills)
+	if game.is_night:
+		_text(Vector2(w - 260, 34), "NIGHT %d   %ds" % [game.day, int(ceil(game.time_left()))], 22, Color(0.6, 0.7, 1.0))
+		_text(Vector2(w - 260, 60), "Survive until dawn", 14, Color(1, 1, 1, 0.75))
+	else:
+		_text(Vector2(w - 260, 34), "Day %d" % game.day, 22, Color(1, 0.95, 0.7))
+		_text(Vector2(w - 260, 60), "Campfire starts the night", 14, Color(1, 1, 1, 0.75))
+	_text(Vector2(w - 260, 84), "Kills %d" % game.kills)
 
 	# Prompt when standing next to something you can use.
 	if not p.dead and not game.ui_open:
@@ -70,7 +72,13 @@ func _draw() -> void:
 		else:
 			var s = game.nearest_structure(p.global_position, 64.0)
 			if s != null:
-				what = "open chest" if s.kind == "chest" else "use workbench"
+				match s.kind:
+					"chest":
+						what = "open chest"
+					"campfire":
+						what = "" if game.is_night else "start the night"
+					_:
+						what = "use workbench"
 		if what != "":
 			_text_centered(h * 0.62, prompt("interact") + "  " + what, 18, Color(1, 1, 0.8))
 
