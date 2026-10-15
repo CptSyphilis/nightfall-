@@ -501,7 +501,7 @@ func _run() -> void:
 	p.use_mouse_aim = true
 	joy_axis(JOY_AXIS_RIGHT_X, 0.0)
 	joy_axis(JOY_AXIS_RIGHT_Y, -1.0)
-	await frames(3)
+	await frames(6)
 	check(p.using_controller, "touching a stick switches to controller mode")
 	check(p.aim_dir.distance_to(Vector2.UP) < 0.05, "right stick aims")
 	joy_axis(JOY_AXIS_RIGHT_Y, 0.0)
@@ -714,7 +714,7 @@ func _run() -> void:
 	# The maze line is still standing in front of the base, like a Maul map.
 	z = game.spawn_zombie(cellpos.call(9, 0), true)
 	var smashed := false
-	for i in 1500:
+	for i in 3000:   # the map is random, so some walks to the base are long
 		await physics_frame
 		for wall in ring:
 			if not is_instance_valid(wall) or wall.hp < wall.max_hp:
@@ -877,6 +877,28 @@ func _run() -> void:
 	for c in get_nodes_in_group("crates"):
 		if c.global_position.distance_to(p.position) < 150:
 			c.queue_free()
+	await frames(1)
+
+	# --- campfire pointer (arrow at the screen edge)
+	var Hud = load("res://scripts/hud.gd")
+	var scr := Vector2(1280, 720)
+	check(not Hud.campfire_pointer(Vector2(640, 360), scr, 40.0)["show"], "no campfire arrow when the fire is on screen")
+	var right = Hud.campfire_pointer(Vector2(3000, 360), scr, 40.0)
+	check(right["show"] and is_equal_approx(right["pos"].x, 1240.0) and is_equal_approx(right["pos"].y, 360.0), "fire far right: arrow on the right edge")
+	check(absf(right["angle"]) < 0.01, "and it points right")
+	var up_left = Hud.campfire_pointer(Vector2(-2000, -2000), scr, 40.0)
+	var inside_screen: bool = Rect2(Vector2(39, 39), scr - Vector2(78, 78)).has_point(up_left["pos"])
+	check(up_left["show"] and inside_screen, "fire up-left: arrow stays inside the screen")
+	var fire2 = game.campfire()
+	if fire2 == null:
+		fire2 = game.spawn_structure("campfire", game.WORLD_SIZE / 2)
+	var fire_home: Vector2 = fire2.global_position
+	fire2.global_position = p.global_position + Vector2(1500, 0)
+	game.hud.queue_redraw()
+	await frames(3)
+	var seen: Vector2 = game.hud.get_viewport().get_canvas_transform() * fire2.global_position
+	check(Hud.campfire_pointer(seen, game.hud.size, 40.0)["show"], "an off-screen campfire in the game gets an arrow")
+	fire2.global_position = fire_home
 	await frames(1)
 
 	# --- death
