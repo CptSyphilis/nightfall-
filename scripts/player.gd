@@ -53,7 +53,7 @@ var inventory = InventoryScript.new()
 
 ## Equipped weapons. "fists" = no melee weapon, "" = no ranged weapon.
 var melee_weapon := "fists"
-var ranged_weapon := ""
+var ranged_weapon := "pistol"
 
 ## Spare ammo and food live in the inventory. These are shortcuts to them.
 var ammo_reserve: int:
@@ -103,7 +103,9 @@ var sprite: Sprite2D
 
 
 func _init() -> void:
-	# Starting kit: no weapons, just a little food. Find or craft the rest.
+	# Starting kit.
+	inventory.add("pistol", 1)
+	inventory.add("ammo", 24)
 	inventory.add("food", 1)
 
 
@@ -569,22 +571,14 @@ func near_workbench() -> bool:
 	return game.nearest_structure(global_position, WORKBENCH_RANGE, "workbench") != null
 
 
-var backpack_level := 0   # 0 = none, 1 = Backpack, 2 = Large backpack
-
-
 func can_craft(id: String) -> bool:
 	var r: Dictionary = Items.recipe(id)
 	if r.is_empty() or dead:
 		return false
-	var lvl := Items.upgrade_level(id)
-	if lvl > 0 and backpack_level != lvl - 1:
-		return false   # backpacks go in order, once each
 	if r["bench"] and not near_workbench():
 		return false
 	if not can_afford(r["cost"]):
 		return false
-	if lvl > 0:
-		return true    # an upgrade takes no inventory space
 	return inventory.space_for(id) >= r["amount"]
 
 
@@ -593,12 +587,6 @@ func craft(id: String) -> bool:
 		return false
 	var r: Dictionary = Items.recipe(id)
 	pay(r["cost"])
-	var lvl := Items.upgrade_level(id)
-	if lvl > 0:
-		backpack_level = lvl
-		inventory.max_slots = Items.BACKPACK_SLOTS[lvl]
-		game.floating_text(global_position + Vector2(0, -30), "%s: %d slots" % [Items.display_name(id), inventory.max_slots], Color(0.6, 1, 0.6))
-		return true
 	inventory.add(id, r["amount"])
 	game.floating_text(global_position + Vector2(0, -30), "Crafted %s" % Items.display_name(id), Color(0.6, 1, 0.6))
 	return true

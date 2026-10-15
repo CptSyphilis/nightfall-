@@ -9,37 +9,24 @@ const TEX_CRATE := preload("res://assets/crate.svg")
 const TEX_BAG := preload("res://assets/bag.svg")
 
 
-# Chance that a crate holds each of these (0.25 = 25%).
-const AMMO_CHANCE := 0.25
-const ARROW_CHANCE := 0.12
-const BANDAGE_CHANCE := 0.10
-const WEAPON_CHANCE := 0.06
-
-
-static func _maybe(rng: RandomNumberGenerator, chance: float, lo: int, hi: int) -> int:
-	return rng.randi_range(lo, hi) if rng.randf() < chance else 0
-
-
 func setup(rng: RandomNumberGenerator, is_small: bool) -> void:
 	small = is_small
-	# Loot is scarce on purpose: craft and farm what you need.
-	# Medkits never show up in loot; you craft them at a workbench.
 	var roll := {
+		"ammo": rng.randi_range(0, 6 if small else 10),
 		"food": rng.randi_range(0, 1 if small else 2),
 		"cloth": rng.randi_range(0, 2 if small else 3),
 		"scrap": rng.randi_range(0, 1 if small else 2),
-		"ammo": _maybe(rng, AMMO_CHANCE, 1 if small else 2, 3 if small else 6),
-		"arrow": _maybe(rng, ARROW_CHANCE, 1, 2 if small else 4),
-		"bandage": _maybe(rng, BANDAGE_CHANCE, 1, 1),
+		"medkit": 1 if rng.randf() < 0.15 else 0,
+		"arrow": rng.randi_range(2, 6) if rng.randf() < 0.2 else 0,
 	}
-	# Big crates very rarely hold a weapon (the only way to find a pistol).
-	if not small and rng.randf() < WEAPON_CHANCE:
-		roll[["club", "machete", "bow", "pistol"][rng.randi_range(0, 3)]] = 1
+	# Big crates sometimes hold a weapon.
+	if not small and rng.randf() < 0.08:
+		roll[["machete", "club", "bow"][rng.randi_range(0, 2)]] = 1
 	for id in roll:
 		if roll[id] > 0:
 			loot[id] = roll[id]
 	if loot.is_empty():
-		loot["cloth"] = 1
+		loot["ammo"] = 4
 
 
 func _ready() -> void:

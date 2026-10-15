@@ -11,8 +11,7 @@ extends Node2D
 const WORLD_SIZE := Vector2(3200, 3200)
 const SAFE_RADIUS := 320.0   # nothing spawns this close to the start point
 const CELL := 32.0           # the building grid; everything on the map lines up with it
-const CAMPFIRE_LIVES := 10
-const ZOMBIE_DROP_CHANCE := 0.08   # chance a killed zombie drops a loot bag   # zombies reaching the campfire cost one each; at 0 you lose
+const CAMPFIRE_LIVES := 10   # zombies reaching the campfire cost one each; at 0 you lose
 
 const PlayerScript := preload("res://scripts/player.gd")
 const ZombieScript := preload("res://scripts/zombie.gd")
@@ -431,19 +430,6 @@ func nearest_usable(pos: Vector2, max_dist: float) -> Node2D:
 	return best
 
 
-## Drops a whole stack from your inventory into a bag at your feet
-## (so a mis-click is never lost: walk over and search it to get it back).
-func drop_items(id: String, amount: int) -> bool:
-	amount = mini(amount, player.inventory.count(id))
-	if amount <= 0:
-		return false
-	player.inventory.remove(id, amount)
-	var bag := spawn_crate(player.global_position, true, {id: amount})
-	bag.loot = {id: amount}
-	floating_text(player.global_position + Vector2(0, -30), "Dropped", Color(1, 1, 1, 0.8))
-	return true
-
-
 ## Moves up to `amount` of an item from one inventory to another. Returns how many moved.
 func transfer(from_inv, to_inv, id: String, amount: int) -> int:
 	var moved: int = to_inv.add(id, mini(amount, from_inv.count(id)))
@@ -462,7 +448,7 @@ func make_noise(pos: Vector2, radius: float) -> void:
 
 func on_zombie_killed(z: Node2D) -> void:
 	kills += 1
-	if rng.randf() < ZOMBIE_DROP_CHANCE:
+	if rng.randf() < 0.2:
 		spawn_crate.call_deferred(z.global_position, true)
 
 

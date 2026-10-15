@@ -11,9 +11,6 @@ const DATA := {
 	"stone":     {"name": "Stone",       "stack": 50,  "color": Color(0.7, 0.7, 0.75)},
 	"scrap":     {"name": "Scrap metal", "stack": 30,  "color": Color(0.8, 0.5, 0.35)},
 	"cloth":     {"name": "Cloth",       "stack": 30,  "color": Color(0.85, 0.82, 0.7)},
-	# Backpacks are upgrades: crafting one gives you more slots right away.
-	"backpack":       {"name": "Backpack",       "stack": 1, "color": Color(0.8, 0.7, 0.5), "upgrade": 1},
-	"large_backpack": {"name": "Large backpack", "stack": 1, "color": Color(0.8, 0.7, 0.5), "upgrade": 2},
 	"arrow":     {"name": "Arrows",      "stack": 50,  "color": Color(0.85, 0.75, 0.55)},
 	"workbench": {"name": "Workbench",   "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
 	"chest":     {"name": "Chest",       "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
@@ -51,8 +48,6 @@ const WEAPONS := {
 
 ## bench = true means you must stand near a placed workbench to craft it.
 const RECIPES := [
-	{"id": "backpack",       "amount": 1, "cost": {"cloth": 6, "wood": 2},  "bench": false},
-	{"id": "large_backpack", "amount": 1, "cost": {"cloth": 10, "scrap": 4}, "bench": true},
 	{"id": "workbench",   "amount": 1, "cost": {"wood": 10, "stone": 4},            "bench": false},
 	{"id": "chest",       "amount": 1, "cost": {"wood": 12},                        "bench": false},
 	{"id": "bandage",     "amount": 1, "cost": {"cloth": 2},                        "bench": false},
@@ -67,15 +62,6 @@ const RECIPES := [
 	{"id": "ammo",        "amount": 6, "cost": {"scrap": 2, "stone": 1},            "bench": true},
 	{"id": "medkit",      "amount": 1, "cost": {"cloth": 3, "scrap": 2},            "bench": true},
 ]
-
-
-## Inventory size for each backpack level: none, Backpack, Large backpack.
-const BACKPACK_SLOTS := [16, 20, 28]
-
-
-## 0 if not a backpack, otherwise the backpack level it gives.
-static func upgrade_level(id: String) -> int:
-	return DATA.get(id, {}).get("upgrade", 0)
 
 
 static func is_weapon(id: String) -> bool:

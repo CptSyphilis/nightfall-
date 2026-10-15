@@ -85,16 +85,6 @@ Night: it gets dark and the horde hunts you. 60 seconds on night 1,
 Dawn:  the zombies are gone and a new day starts. They get tougher every night.
 Hunger drains over time. At 0 you lose health. Keep it above 60 to slowly heal.
 
-Inventory and loot
-------------------
-You start with no weapons: craft them, or get lucky with a rare crate.
-Loot is scarce: ammo, arrows and bandages are rare, medkits are craft-only,
-and zombies seldom drop bags.
-Backpack (6 cloth, 2 wood) gives 20 slots; Large backpack (10 cloth, 4 scrap,
-at a workbench) gives 28.
-Drop items: turn on "Drop items" in the character screen and select a stack;
-it lands in a bag at your feet.
-
 
 Running the tests
 -----------------

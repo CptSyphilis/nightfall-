@@ -45,8 +45,6 @@ func reset_player() -> void:
 	p.shoot_cd = 0.0
 	p.shock_cd = 0.0
 	p.reload_timer = 0.0
-	p.inventory.set_count("pistol", 1)
-	p.ranged_weapon = "pistol"
 	p.ammo_in_mag = p.MAG_SIZE
 	p.ammo_reserve = 24
 	p.collision_mask = 1 | 4
@@ -111,9 +109,6 @@ func _run() -> void:
 			ruins_on_grid = ruins_on_grid and fposmod(v, 32.0) == 0.0
 	check(ruins_on_grid, "ruined buildings line up with the grid")
 	check(game.campfire() == null, "there is no campfire at the start")
-	check(p.ranged_weapon == "" and p.melee_weapon == "fists" and p.inventory.count("pistol") == 0, "you start with no weapons")
-	check(p.inventory.count("ammo") == 0 and p.inventory.count("food") == 1, "you start with no ammo and 1 food")
-	check(p.inventory.max_slots == 16 and p.backpack_level == 0, "you start without a backpack (16 slots)")
 	var actions := ["move_up", "move_down", "move_left", "move_right", "shoot", "melee", "dodge", "ability", "reload", "interact", "eat", "restart"]
 	var all_actions := true
 	for a in actions:
@@ -142,6 +137,7 @@ func _run() -> void:
 	await clear_zombies()
 
 	# --- starting equipment
+	check(p.ranged_weapon == "pistol" and p.melee_weapon == "fists", "you start with a pistol and fists")
 
 	# --- melee kill (with a club)
 	reset_player()
@@ -760,75 +756,6 @@ func _run() -> void:
 	game.game_over = false
 	game.lose_reason = ""
 	await clear_zombies()
-
-	# --- scarcer loot
-	var Crate = load("res://scripts/loot_crate.gd")
-	var lr := RandomNumberGenerator.new()
-	lr.seed = 12345
-	var with_ammo := 0
-	var with_medkit := 0
-	var with_bandage := 0
-	for i in 2000:
-		var cr = Crate.new()
-		cr.setup(lr, i % 4 == 0)
-		with_ammo += 1 if cr.loot.has("ammo") else 0
-		with_medkit += 1 if cr.loot.has("medkit") else 0
-		with_bandage += 1 if cr.loot.has("bandage") else 0
-		cr.free()
-	check(with_medkit == 0, "medkits never appear in loot")
-	check(with_ammo > 300 and with_ammo < 700, "about 1 in 4 crates has ammo (%d of 2000)" % with_ammo)
-	check(with_bandage > 100 and with_bandage < 300, "about 1 in 10 crates has a bandage (%d of 2000)" % with_bandage)
-	check(game.ZOMBIE_DROP_CHANCE <= 0.1, "zombies rarely drop loot bags")
-
-	# --- backpack upgrades
-	reset_player()
-	p.inventory.set_count("cloth", 0)
-	check(not p.can_craft("backpack"), "a backpack needs materials")
-	p.inventory.set_count("cloth", 30)
-	p.inventory.set_count("wood", 10)
-	p.inventory.set_count("scrap", 10)
-	check(not p.can_craft("large_backpack"), "the large backpack needs the normal backpack first")
-	check(p.craft("backpack") and p.inventory.max_slots == 20 and p.backpack_level == 1, "a backpack gives 20 slots")
-	check(p.inventory.count("backpack") == 0, "the backpack is worn, not carried")
-	check(not p.can_craft("backpack"), "you can only craft the backpack once")
-	var bench2 = null
-	for st in get_nodes_in_group("structures"):
-		if st.kind == "workbench":
-			bench2 = st
-	if bench2 == null:
-		p.inventory.set_count("workbench", 1)
-		p.place_structure("workbench", p.position + Vector2(0, 64))
-		await frames(1)
-	else:
-		p.position = bench2.global_position + Vector2(0, 40)
-	check(p.near_workbench() and p.craft("large_backpack") and p.inventory.max_slots == 28, "a large backpack gives 28 slots (at a workbench)")
-
-	# --- dropping items
-	reset_player()
-	for c in get_nodes_in_group("crates"):
-		if c.global_position.distance_to(p.position) < 100:
-			c.queue_free()
-	await frames(1)
-	p.inventory.set_count("stone", 7)
-	check(game.drop_items("stone", 7) and p.inventory.count("stone") == 0, "drop a whole stack")
-	await frames(1)
-	var dropped_bag = game.nearest_crate(p.position, 48.0)
-	check(dropped_bag != null and dropped_bag.loot.get("stone", 0) == 7, "dropped items land in a bag at your feet")
-	check(p.interact() and p.inventory.count("stone") == 7, "search the bag to get them back")
-	p.inventory.set_count("club", 1)
-	p.equip("club")
-	game.drop_items("club", 1)
-	p.melee_cd = 0.0
-	p.melee()
-	check(p.melee_weapon == "fists", "dropping your equipped weapon leaves you with fists")
-	game.ui.open()
-	game.ui.drop_mode = true
-	game.ui.refresh(true)
-	p.inventory.set_count("wood", 3)
-	game.ui._on_player_item("wood")
-	check(p.inventory.count("wood") == 0, "drop mode in the character screen drops the stack")
-	game.ui.close()
-	check(not game.ui.drop_mode, "drop mode switches off when the screen closes")
 
 	# --- death
 	reset_player()
