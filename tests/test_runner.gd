@@ -676,33 +676,6 @@ func _run() -> void:
 		maze_intact = maze_intact and is_instance_valid(wall) and wall.hp == wall.max_hp
 	check(maze_intact, "zombies walk the maze to the base instead of breaking the maze")
 	await clear_zombies()
-
-	# A zombie that can't move breaks the wall it is pressed against.
-	reset_player()
-	var block_wall = null
-	game.build_piece("stone_wall", cellpos.call(0, -6))
-	for st in get_nodes_in_group("structures"):
-		if st.kind == "stone_wall":
-			block_wall = st
-	z = game.spawn_zombie(block_wall.global_position + Vector2(0, -30), false)
-	await frames(1)
-	z.state = "investigate"
-	z.target_pos = p.position
-	z.investigate_timer = 99.0
-	z.speed = 0.0     # stands in for "jammed in a crowd / wedged in a corner"
-	var hit_while_stuck := false
-	for i in 300:
-		await physics_frame
-		z.state = "investigate"
-		if block_wall.hp < block_wall.max_hp:
-			hit_while_stuck = true
-			break
-	check(hit_while_stuck, "a zombie that can't move smashes the wall it is pressed against")
-	z.speed = 60.0
-	await clear_zombies()
-	game.demolish_at(block_wall.global_position)
-	await frames(2)
-	await clear_zombies()
 	for st in get_nodes_in_group("structures"):
 		if true:
 			st.remove_from_group("structures")

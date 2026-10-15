@@ -16,13 +16,9 @@ extends CharacterBody2D
 ##   buildings, trees, rocks and anything you built, and follows it.
 ##   It also keeps a little distance from other zombies, and if it stops
 ##   making progress it re-plans and steps sideways.
-##   It smashes walls in two cases:
-##     - there is NO open way to you (you walled yourself in): it walks the
-##       route as far as it goes, then smashes the wall in front of it
-##     - it is stuck and can't move for about 2 seconds: it smashes the wall
-##       it is pressed against to make an opening
-##   A zombie that is moving along an open route leaves walls alone,
-##   which is what makes maze building work.
+##   If there is NO open way to you (you walled yourself in), it walks up to
+##   the nearest wall and smashes it. While any route is open it follows the
+##   route instead, which is what makes maze building work.
 
 const SIGHT_CHECK_TIME := 0.2    # how often it looks for you
 const LINE_CHECK_TIME := 0.15    # how often it checks if the way ahead is clear
@@ -67,7 +63,6 @@ var _path_blocked := false     # true when no route reaches the goal: time to br
 
 # Getting unstuck
 var _stuck_timer := 0.0
-var _stuck_count := 0          # stuck checks in a row without moving (0.8 s each)
 var _stuck_check_pos := Vector2.ZERO
 var _sidestep := Vector2.ZERO
 var _sidestep_timer := 0.0
@@ -172,12 +167,10 @@ func _physics_process(delta: float) -> void:
 	knockback = knockback.move_toward(Vector2.ZERO, 1400.0 * delta)
 	move_and_slide()
 	_check_stuck(delta, has_goal)
-	# Smash a wall when walled off (at the end of the route, after walking any maze),
-	# or when stuck and unable to move for a while.
-	var walled_off := _path_blocked and _path_i >= _path.size() - 1
-	var cant_move := _stuck_count >= 2 and state != "wander"
-	if has_goal and (walled_off or cant_move):
-		_smash_what_is_in_the_way(goal)
+	# Walled off: follow the route as far as it goes (through any maze),
+	# and only start smashing once there is nowhere further to walk.
+	if has_goal and _path_blocked and _path_i >= _path.size() - 1:
+		_smash_what_is_in_the_way()
 
 	if player_alive and dist < radius + player.radius + 10.0 and attack_cd <= 0.0:
 		attack_cd = 1.0
@@ -272,24 +265,15 @@ func _repath(goal: Vector2) -> void:
 
 
 ## Hit whatever built thing we are pressed against (only used when walled off).
-## Hits the built thing it is touching, preferring the one between it and its goal.
-func _smash_what_is_in_the_way(goal: Vector2) -> void:
+func _smash_what_is_in_the_way() -> void:
 	if attack_cd > 0.0:
 		return
-	var best: Node2D = null
-	var best_d := INF
-	for s in get_tree().get_nodes_in_group("structures"):
-		if not s.breakable or not s.blocks_path():
-			continue
-		if not s.rect().grow(radius + 6.0).has_point(global_position):
-			continue   # not touching it
-		var d: float = s.global_position.distance_to(goal)
-		if d < best_d:
-			best_d = d
-			best = s
-	if best != null:
-		attack_cd = 1.0
-		best.take_damage(damage * 1.5)
+	for i in get_slide_collision_count():
+		var c := get_slide_collision(i).get_collider()
+		if c != null and c.is_in_group("structures") and c.breakable:
+			attack_cd = 1.0
+			c.take_damage(damage * 1.5)
+			return
 
 
 ## A small push away from zombies that are too close, so crowds don't jam.
@@ -314,20 +298,14 @@ func _check_stuck(delta: float, trying_to_move: bool) -> void:
 	_stuck_timer = 0.0
 	var moved := global_position.distance_to(_stuck_check_pos)
 	_stuck_check_pos = global_position
-	if not (trying_to_move and moved < 10.0):
-		_stuck_count = 0
-		return
-	_stuck_count += 1
-	_repath_timer = 0.0
-	_line_timer = 0.0
-	if state == "wander":
-		wander_timer = 0.0   # pick somewhere else to shuffle to
-	if _stuck_count == 1:
-		# First try: step sideways and re-plan. If that doesn't help,
-		# the next check counts as "can't move" and it starts smashing.
+	if trying_to_move and moved < 10.0:
+		_repath_timer = 0.0
+		_line_timer = 0.0
 		var side := velocity.orthogonal().normalized() if velocity.length() > 1.0 else Vector2.from_angle(_rng.randf() * TAU)
 		_sidestep = side * (1.0 if _rng.randf() < 0.5 else -1.0)
 		_sidestep_timer = 0.4
+		if state == "wander":
+			wander_timer = 0.0   # pick somewhere else to shuffle to
 
 
 func _pick_wander_target() -> void:
