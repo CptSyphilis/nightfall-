@@ -8,6 +8,7 @@ const StructureScript := preload("res://scripts/structure.gd")
 const PLACE_RANGE := 150.0
 
 var game: Node
+var _web_r2_was_down := false
 
 
 func _ready() -> void:
@@ -23,6 +24,11 @@ func _process(_delta: float) -> void:
 		global_position = game.snap(p.global_position + p.aim_dir * 80.0)
 	else:
 		global_position = game.snap(get_global_mouse_position())
+	# Browser: R2 does not arrive as a normal input event (see player.gd), so check it here.
+	var r2_down: bool = p.web_r2 > 0.5
+	if r2_down and not _web_r2_was_down and is_valid():
+		p.place_structure(game.placing, global_position)
+	_web_r2_was_down = r2_down
 	queue_redraw()
 
 

@@ -442,7 +442,9 @@ func _run() -> void:
 		and mapped_button("inventory", JOY_BUTTON_START) and mapped_axis("move_left", JOY_AXIS_LEFT_X) \
 		and mapped_axis("aim_up", JOY_AXIS_RIGHT_Y), "controller buttons and sticks are mapped")
 	check(p.style_from_name("PS4 Controller") == "ps" and p.style_from_name("Sony Interactive Entertainment Wireless Controller") == "ps" \
-		and p.style_from_name("DualSense Wireless Controller") == "ps" and p.style_from_name("Xbox Wireless Controller") == "xbox", \
+		and p.style_from_name("DualSense Wireless Controller") == "ps" \
+		and p.style_from_name("Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)") == "ps" \
+		and p.style_from_name("Xbox 360 Controller (XInput STANDARD GAMEPAD)") == "xbox" and p.style_from_name("Xbox Wireless Controller") == "xbox", \
 		"PlayStation and Xbox pads are told apart")
 	p.controls_enabled = true
 	p.use_mouse_aim = true

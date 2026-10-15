@@ -76,6 +76,12 @@ var use_mouse_aim := true          # false = aim is set from code (tests)
 var using_controller := false      # true after the last input came from a gamepad
 var controller_style := "xbox"     # "xbox" or "ps", decides the button names shown
 var last_pad_device := -1          # for the F3 input checker
+var web_r2 := 0.0                  # browser only: R2/RT read straight from the browser (see _poll_web_trigger)
+
+# Browser version only. Godot 4.3's web build drops the analog triggers of
+# standard gamepads, so R2/RT never arrives as normal input. This reads it
+# straight from the browser's Gamepad API instead (button 7 = R2 / RT).
+const JS_READ_R2 := "(function(){var g=navigator.getGamepads?navigator.getGamepads():[];var m=0;for(var i=0;i<g.length;i++){var p=g[i];if(p&&p.buttons&&p.buttons.length>7){var b=p.buttons[7];var v=(typeof b==='object')?(b.value||(b.pressed?1:0)):b;if(v>m)m=v;}}return m;})()"
 var last_pad_input := "(nothing yet)"
 var game: Node
 var light: PointLight2D
@@ -133,6 +139,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_tick_timers(delta)
 	_tick_survival(delta)
+	_poll_web_trigger()
 	light.energy = game.night_amount * 0.9
 
 	# While the character screen is open you stand still
@@ -156,7 +163,7 @@ func _physics_process(delta: float) -> void:
 		if not in_menu:
 			# No fighting while placing a structure.
 			var can_fight: bool = game.placing == "" and action_block <= 0.0
-			if can_fight and Input.is_action_pressed("shoot"):
+			if can_fight and (Input.is_action_pressed("shoot") or web_r2 > 0.5):
 				shoot()
 			if can_fight and Input.is_action_pressed("melee"):
 				melee()
@@ -198,11 +205,31 @@ func _input(event: InputEvent) -> void:
 		last_pad_input = "axis %d = %.2f" % [event.axis, event.axis_value]
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.3):
 		if not using_controller or controller_style == "keyboard":
-			controller_style = style_from_name(Input.get_joy_name(event.device))
+			controller_style = style_from_name(pad_name(event.device))
 		using_controller = true
 	elif event is InputEventKey or event is InputEventMouseButton \
 			or (event is InputEventMouseMotion and event.relative.length() > 2.0):
 		using_controller = false
+
+
+func _poll_web_trigger() -> void:
+	if not OS.has_feature("web"):
+		return
+	var v = JavaScriptBridge.eval(JS_READ_R2, true)
+	web_r2 = float(v) if v != null else 0.0
+	if web_r2 > 0.5 and not using_controller:
+		using_controller = true
+		controller_style = style_from_name(pad_name(0))
+
+
+## The controller's real name. In the browser, Godot only reports
+## "Standard Gamepad Mapping", so ask the browser for the actual name.
+func pad_name(device: int) -> String:
+	if OS.has_feature("web"):
+		var id = JavaScriptBridge.eval("(function(){var g=navigator.getGamepads?navigator.getGamepads()[%d]:null;return g?g.id:'';})()" % maxi(device, 0), true)
+		if id != null and str(id) != "":
+			return str(id)
+	return Input.get_joy_name(device)
 
 
 ## "ps" for PlayStation pads, "xbox" for everything else (Xbox and generic pads).
@@ -213,7 +240,8 @@ static func style_from_name(joy_name: String) -> String:
 	for word in ["xbox", "microsoft", "x-box"]:
 		if word in n:
 			return "xbox"
-	for word in ["ps3", "ps4", "ps5", "playstation", "sony", "dualshock", "dualsense", "wireless controller"]:
+	# "054c" is Sony's USB vendor id, which browsers include in the pad name.
+	for word in ["ps3", "ps4", "ps5", "playstation", "sony", "dualshock", "dualsense", "wireless controller", "054c"]:
 		if word in n:
 			return "ps"
 	return "xbox"

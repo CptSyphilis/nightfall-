@@ -100,11 +100,13 @@ func _draw_input_debug(p) -> void:
 		lines.append("No controller detected")
 	for d in pads:
 		var known := "standard layout" if Input.is_joy_known(d) else "UNKNOWN layout"
-		lines.append("Pad %d: %s  (%s)" % [d, Input.get_joy_name(d), known])
+		lines.append("Pad %d: %s  (%s)" % [d, p.pad_name(d), known])
 	lines.append("Last input: %s" % p.last_pad_input)
 	lines.append("R2/RT axis: %.2f   shoot pressed: %s" % [
 		Input.get_joy_axis(maxi(p.last_pad_device, 0), JOY_AXIS_TRIGGER_RIGHT),
 		"YES" if Input.is_action_pressed("shoot") else "no"])
+	if OS.has_feature("web"):
+		lines.append("Browser R2/RT: %.2f" % p.web_r2)
 	lines.append("Prompts: %s" % p.prompt_style())
 	var y := 240.0
 	draw_rect(Rect2(14, y - 22, 560, 22 * lines.size() + 12), Color(0, 0, 0, 0.75))
