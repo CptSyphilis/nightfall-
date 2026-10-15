@@ -14,6 +14,7 @@ var _inv: VBoxContainer
 var _side: VBoxContainer
 var _last_signature := ""
 var _focus_key := ""     # which button had controller focus, kept across rebuilds
+var drop_mode := false   # when on, selecting an item drops the whole stack in a bag
 
 
 func _ready() -> void:
@@ -74,6 +75,7 @@ func open_chest(c: Node) -> void:
 
 func close() -> void:
 	visible = false
+	drop_mode = false
 	chest = null
 
 
@@ -111,7 +113,7 @@ func _process(_delta: float) -> void:
 ## Rebuilds the buttons, but only when something actually changed.
 func refresh(force: bool = false) -> void:
 	var p = game.player
-	var sig: String = p.inventory.signature() + str(p.near_workbench()) + p.melee_weapon + p.ranged_weapon \
+	var sig: String = p.inventory.signature() + str(p.near_workbench()) + p.melee_weapon + p.ranged_weapon + str(drop_mode) + str(p.backpack_level) \
 		+ str(int(p.health)) + str(int(p.hunger)) + str(p.using_controller)
 	if chest != null:
 		sig += chest.storage.signature()
@@ -166,6 +168,7 @@ func _build_character(p) -> void:
 	_char.add_child(_title("Stats"))
 	_char.add_child(_stat("Health", "%d / %d" % [p.health, p.max_health]))
 	_char.add_child(_stat("Hunger", "%d%%" % p.hunger))
+	_char.add_child(_stat("Backpack", ["none", "Backpack", "Large backpack"][p.backpack_level]))
 	_char.add_child(_stat("Melee damage", "%d" % m["damage"]))
 	_char.add_child(_stat("Melee reach", "%d" % m["range"]))
 	if r.is_empty():
@@ -182,8 +185,16 @@ func _build_inventory(p) -> void:
 	var inv = p.inventory
 	_inv.add_child(_title("Inventory   %d / %d slots" % [inv.slots_used(), inv.max_slots]))
 	_inv.add_child(_item_grid(inv, _on_player_item, p))
+	if chest == null:
+		var tb := _button("Drop items: ON  (select to turn off)" if drop_mode else "Drop items: off")
+		tb.add_theme_color_override("font_color", Color(1, 0.5, 0.4) if drop_mode else Color(1, 1, 1, 0.75))
+		tb.set_meta("key", "drop_toggle")
+		tb.pressed.connect(_on_toggle_drop)
+		_inv.add_child(tb)
 	var hint := "Select an item to put it in the chest" if chest != null \
 		else "Select a weapon to equip it.\nSelect food or medicine to use it.\nSelect a chest or workbench to place it."
+	if drop_mode and chest == null:
+		hint = "DROP MODE: select an item to drop the whole stack\nin a bag at your feet (search the bag to get it back)."
 	_inv.add_child(_small(hint))
 
 
@@ -326,9 +337,16 @@ func _small(text: String) -> Label:
 
 # ---------------------------------------------------------------- clicks
 
+func _on_toggle_drop() -> void:
+	drop_mode = not drop_mode
+	refresh(true)
+
+
 func _on_player_item(id: String) -> void:
 	var p = game.player
-	if chest != null:
+	if drop_mode and chest == null:
+		game.drop_items(id, p.inventory.count(id))
+	elif chest != null:
 		game.transfer(p.inventory, chest.storage, id, p.inventory.count(id))
 	elif Items.is_weapon(id):
 		p.equip(id)
