@@ -14,9 +14,10 @@ const PIECES := {
 	"door":       {"name": "Door",        "cost": {"wood": 4, "scrap": 1},             "hp": 160.0},
 	"spikes":     {"name": "Spike trap",  "cost": {"wood": 3, "stone": 1},             "hp": 80.0},
 	"tower":      {"name": "Arrow tower", "cost": {"wood": 10, "stone": 6, "scrap": 3}, "hp": 300.0},
+	"concrete_floor": {"name": "Concrete floor", "cost": {"concrete": 1},          "hp": 500.0},
 }
 
-const ORDER := ["campfire", "wood_wall", "stone_wall", "door", "spikes", "tower"]
+const ORDER := ["campfire", "wood_wall", "stone_wall", "door", "spikes", "tower", "concrete_floor"]
 
 ## What each piece does, shown in build mode.
 const INFO := {
@@ -26,7 +27,14 @@ const INFO := {
 	"door": "You walk through, zombies don't",
 	"spikes": "Hurts and slows zombies walking over it",
 	"tower": "Shoots zombies by itself",
+	"concrete_floor": "Floor for your base. Build walls and chests on top",
 }
+
+
+## Floors lie under everything: you can build walls, traps and chests on top,
+## and nobody bumps into them.
+static func is_floor(kind: String) -> bool:
+	return kind == "concrete_floor"
 
 
 static func is_piece(kind: String) -> bool:

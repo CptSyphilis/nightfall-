@@ -37,6 +37,7 @@ const SIZES := {
 	"door": Vector2(32, 32),
 	"spikes": Vector2(32, 32),
 	"tower": Vector2(32, 32),
+	"concrete_floor": Vector2(32, 32),
 }
 
 # Spike trap
@@ -77,8 +78,8 @@ func _ready() -> void:
 	add_to_group("structures")
 	collision_mask = 0
 	match kind:
-		"spikes":
-			collision_layer = 0          # you walk over traps
+		"spikes", "concrete_floor":
+			collision_layer = 0          # you walk over traps and floors
 		"door":
 			collision_layer = LAYER_DOOR
 		_:
@@ -94,7 +95,11 @@ func _ready() -> void:
 
 ## True if zombies have to walk around it (traps don't count).
 func blocks_path() -> bool:
-	return kind != "spikes"
+	return kind != "spikes" and not is_floor()
+
+
+func is_floor() -> bool:
+	return Buildings.is_floor(kind)
 
 
 ## True if the player can press E / Square on it.
@@ -219,6 +224,12 @@ func _draw() -> void:
 ## Draws a structure onto any canvas item (also used for the build mode preview).
 static func draw_piece(ci: CanvasItem, k: String, sz: Vector2, t: float = 0.0, aim: float = -PI / 2) -> void:
 	var r := Rect2(-sz / 2, sz)
+	if k == "concrete_floor":
+		ci.draw_rect(r, Color(0.52, 0.52, 0.5))
+		ci.draw_rect(r.grow(-1.0), Color(0.6, 0.6, 0.58))
+		ci.draw_line(r.position + Vector2(5, 9), r.position + Vector2(12, 11), Color(0.5, 0.5, 0.48), 1.0)
+		ci.draw_line(r.position + Vector2(20, 22), r.position + Vector2(26, 19), Color(0.5, 0.5, 0.48), 1.0)
+		return
 	# Soft drop shadow under the things that stand up off the ground.
 	if k in ["chest", "workbench", "tower"]:
 		ci.draw_rect(Rect2(r.position + Vector2(3, 4), r.size), Color(0, 0, 0, 0.3))

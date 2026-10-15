@@ -9,24 +9,33 @@ const TEX_CRATE := preload("res://assets/crate.svg")
 const TEX_BAG := preload("res://assets/bag.svg")
 
 
+## Loot chances. Change these numbers to make loot more or less common.
+const AMMO_SMALL := 3          # small bags: 0 to this many bullets
+const AMMO_BIG := 5            # big crates: 0 to this many bullets
+const ARROW_CHANCE := 0.10     # chance of finding 1-4 arrows
+const BANDAGE_CHANCE := 0.40   # chance of finding bandages (1, or 1-2 in big crates)
+const WEAPON_CHANCE := 0.08    # big crates only
+const WEAPONS := ["machete", "club", "bow", "pistol"]
+
+
 func setup(rng: RandomNumberGenerator, is_small: bool) -> void:
 	small = is_small
 	var roll := {
-		"ammo": rng.randi_range(0, 6 if small else 10),
+		"ammo": rng.randi_range(0, AMMO_SMALL if small else AMMO_BIG),
 		"food": rng.randi_range(0, 1 if small else 2),
 		"cloth": rng.randi_range(0, 2 if small else 3),
 		"scrap": rng.randi_range(0, 1 if small else 2),
-		"medkit": 1 if rng.randf() < 0.15 else 0,
-		"arrow": rng.randi_range(2, 6) if rng.randf() < 0.2 else 0,
+		"bandage": (1 if small else rng.randi_range(1, 2)) if rng.randf() < BANDAGE_CHANCE else 0,
+		"arrow": rng.randi_range(1, 4) if rng.randf() < ARROW_CHANCE else 0,
 	}
-	# Big crates sometimes hold a weapon.
-	if not small and rng.randf() < 0.08:
-		roll[["machete", "club", "bow"][rng.randi_range(0, 2)]] = 1
+	# Medkits are never found as loot. Craft them at a workbench.
+	if not small and rng.randf() < WEAPON_CHANCE:
+		roll[WEAPONS[rng.randi_range(0, WEAPONS.size() - 1)]] = 1
 	for id in roll:
 		if roll[id] > 0:
 			loot[id] = roll[id]
 	if loot.is_empty():
-		loot["ammo"] = 4
+		loot["cloth"] = 1
 
 
 func _ready() -> void:

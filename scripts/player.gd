@@ -48,12 +48,12 @@ var radius := 14.0
 var max_health := 100.0
 var health := 100.0
 var hunger := 100.0
-var ammo_in_mag := MAG_SIZE     # rounds loaded in the pistol
+var ammo_in_mag := 0            # rounds loaded in the pistol
 var inventory = InventoryScript.new()
 
 ## Equipped weapons. "fists" = no melee weapon, "" = no ranged weapon.
 var melee_weapon := "fists"
-var ranged_weapon := "pistol"
+var ranged_weapon := ""
 
 ## Spare ammo and food live in the inventory. These are shortcuts to them.
 var ammo_reserve: int:
@@ -103,10 +103,8 @@ var sprite: Sprite2D
 
 
 func _init() -> void:
-	# Starting kit.
-	inventory.add("pistol", 1)
-	inventory.add("ammo", 24)
-	inventory.add("food", 1)
+	# You start with nothing but your fists. Find or craft everything else.
+	pass
 
 
 func _ready() -> void:
@@ -507,6 +505,21 @@ func _search_crate(crate: Node2D) -> bool:
 	return true
 
 
+## Throws away a whole stack. It lands in a bag at your feet, so you can pick it up again.
+func discard(id: String) -> bool:
+	var amount: int = inventory.count(id)
+	if dead or amount <= 0:
+		return false
+	inventory.set_count(id, 0)
+	if id == melee_weapon:
+		unequip("melee")
+	if id == ranged_weapon:
+		unequip("ranged")
+	game.spawn_crate(global_position, true, {id: amount})
+	game.hud.show_message("Dropped %d %s" % [amount, Items.display_name(id)], 1.5)
+	return true
+
+
 ## H key: use a bandage, or a medkit if you have no bandages.
 func heal() -> bool:
 	if inventory.count("bandage") > 0:
@@ -579,6 +592,8 @@ func can_craft(id: String) -> bool:
 		return false
 	if not can_afford(r["cost"]):
 		return false
+	if r.has("slots"):
+		return inventory.max_slots == r["from_slots"]   # upgrades go in order
 	return inventory.space_for(id) >= r["amount"]
 
 
@@ -587,7 +602,10 @@ func craft(id: String) -> bool:
 		return false
 	var r: Dictionary = Items.recipe(id)
 	pay(r["cost"])
-	inventory.add(id, r["amount"])
+	if r.has("slots"):
+		inventory.max_slots = r["slots"]   # backpacks are worn right away
+	else:
+		inventory.add(id, r["amount"])
 	game.floating_text(global_position + Vector2(0, -30), "Crafted %s" % Items.display_name(id), Color(0.6, 1, 0.6))
 	return true
 

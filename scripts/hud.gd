@@ -92,6 +92,8 @@ func _draw() -> void:
 		var a := clampf(_message_time, 0.0, 1.0)
 		_text_centered(110, _message, 20, Color(1, 1, 1, a))   # smaller so it never runs into the corner text
 
+	_draw_campfire_pointer()
+
 	if game.show_input_debug:
 		_draw_input_debug(p)
 
@@ -109,11 +111,47 @@ func _draw() -> void:
 		_text_centered(h / 2 + 50, "Press %s to try again" % prompt("restart"), 18, Color(1, 1, 1, 0.8))
 
 
+## An arrow at the edge of the screen pointing to the campfire when you can't see it.
+func _draw_campfire_pointer() -> void:
+	var fire = game.campfire()
+	if fire == null or game.game_over:
+		return
+	var screen_pos: Vector2 = get_viewport().get_canvas_transform() * fire.global_position
+	var info := campfire_pointer(screen_pos, size, 40.0)
+	if not info["show"]:
+		return
+	var at: Vector2 = info["pos"]
+	var dir := Vector2.from_angle(info["angle"])
+	var side := dir.orthogonal()
+	var color := Color(1.0, 0.6, 0.25, 0.9) if not game.is_night else Color(1.0, 0.4, 0.2, 0.95)
+	draw_colored_polygon(PackedVector2Array([at + dir * 16.0, at - dir * 8.0 + side * 10.0, at - dir * 8.0 - side * 10.0]), color)
+	var dist := int(game.player.global_position.distance_to(fire.global_position) / 32.0)
+	var label := "Campfire %dm" % dist
+	var tw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	_text(at - dir * 26.0 - Vector2(tw / 2.0, -4.0), label, 13, color)
+
+
+## Where to draw the campfire arrow. If the campfire is on screen there is no arrow.
+## Otherwise the arrow sits on the screen edge (margin pixels in), on the line from
+## the screen center to the campfire, and points at it.
+static func campfire_pointer(screen_pos: Vector2, screen_size: Vector2, margin: float) -> Dictionary:
+	var inner := Rect2(Vector2(margin, margin), screen_size - Vector2(margin, margin) * 2.0)
+	if Rect2(Vector2.ZERO, screen_size).has_point(screen_pos):
+		return {"show": false}
+	var center := screen_size / 2.0
+	var d := screen_pos - center
+	# Shrink the line until it touches the inner rectangle.
+	var half := inner.size / 2.0
+	var t := minf(half.x / maxf(absf(d.x), 0.001), half.y / maxf(absf(d.y), 0.001))
+	return {"show": true, "pos": center + d * t, "angle": d.angle()}
+
+
 ## Build mode: the row of pieces at the bottom, what they cost, and the controls.
 func _draw_build_bar(p, w: float, h: float) -> void:
-	var slot := Vector2(170, 62)
 	var gap := 8.0
 	var n := Buildings.ORDER.size()
+	# Slots shrink when there are many pieces, so the row always fits the screen.
+	var slot := Vector2(minf(170.0, (w - 40.0 - gap * (n - 1)) / n), 62)
 	var x0 := (w - (slot.x * n + gap * (n - 1))) / 2.0
 	var y0 := h - 112.0
 	for i in n:
@@ -126,7 +164,7 @@ func _draw_build_bar(p, w: float, h: float) -> void:
 		_text(r.position + Vector2(8, 18), "%d  %s" % [i + 1, Buildings.display_name(kind)], 15, Color(1, 0.92, 0.75) if chosen else Color.WHITE)
 		_text(r.position + Vector2(8, 37), Items.describe_cost(Buildings.cost(kind)), 13, Color(0.7, 1, 0.7) if afford else Color(1, 0.45, 0.4))
 		_text(r.position + Vector2(8, 54), Buildings.INFO[kind], 11, Color(1, 1, 1, 0.6))
-	var hint := "BUILD MODE   %s build (hold to drag)   %s demolish   %s choose   %s exit" % [
+	var hint := "BUILD MODE   %s build (hold to drag)   %s demolish (hold to drag)   %s choose   %s exit" % [
 		prompt("shoot"), prompt("demolish"), prompt("choose"), prompt("build")]
 	_text_centered(h - 18.0, hint, 15, Color(1, 0.92, 0.75))
 

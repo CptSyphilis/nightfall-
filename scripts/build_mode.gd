@@ -2,10 +2,11 @@ extends Node2D
 ## Build mode (B on keyboard, D-pad right on a controller).
 ## Shows a preview square on the grid. Hold the build button and move
 ## to draw a line of walls, like building a maze in a Warcraft 3 "Maul" map.
+## Hold the demolish button and move to remove a whole line the same way.
 ##
 ##                 Keyboard + mouse     Xbox          PlayStation
 ##   build         left click (hold)    RT (hold)     R2 (hold)
-##   demolish      right click          Y             Triangle
+##   demolish      right click (hold)   Y (hold)      Triangle (hold)
 ##   choose piece  mouse wheel / 1-5    LB / RB       L1 / R1
 ##   exit          B or Esc             D-pad right   D-pad right (or B / Circle)
 
@@ -16,7 +17,9 @@ const BUILD_RANGE := 220.0
 var game: Node
 var active := false
 var selected := "wood_wall"
-var _last_cell := Vector2i(-99999, -99999)
+const NO_CELL := Vector2i(-99999, -99999)
+var _last_cell := NO_CELL          # last square built on while holding build
+var _last_remove_cell := NO_CELL   # last square demolished while holding demolish
 
 
 func _ready() -> void:
@@ -34,7 +37,8 @@ func set_active(on: bool) -> void:
 		game.cancel_placing()
 		game.ui.close()
 		game.hud.show_message("Build mode - %s" % Buildings.display_name(selected), 1.5)
-	_last_cell = Vector2i(-99999, -99999)
+	_last_cell = NO_CELL
+	_last_remove_cell = NO_CELL
 
 
 func select(kind: String) -> void:
@@ -68,16 +72,28 @@ func _process(_delta: float) -> void:
 	if not visible:
 		return
 	global_position = target_position()
-	# Hold the build button to keep placing as the preview moves to new squares.
 	var p = game.player
-	var held: bool = p.controls_enabled and (Input.is_action_pressed("shoot") or p.web_r2 > 0.5)
-	if held:
-		var cell: Vector2i = game.nav.to_cell(global_position)
-		if cell != _last_cell and in_range(global_position) and game.build_piece(selected, global_position):
+	var build_held: bool = p.controls_enabled and (Input.is_action_pressed("shoot") or p.web_r2 > 0.5)
+	var remove_held: bool = p.controls_enabled and Input.is_action_pressed("demolish")
+	drag(global_position, build_held, remove_held)
+	queue_redraw()
+
+
+## Hold build or demolish and move: it builds (or removes) once on every
+## new square the preview passes over. Each square is only done once per drag.
+func drag(pos: Vector2, build_held: bool, remove_held: bool) -> void:
+	var cell: Vector2i = game.nav.to_cell(pos)
+	if build_held:
+		if cell != _last_cell and in_range(pos) and game.build_piece(selected, pos):
 			_last_cell = cell
 	else:
-		_last_cell = Vector2i(-99999, -99999)
-	queue_redraw()
+		_last_cell = NO_CELL
+	if remove_held and not build_held:
+		if cell != _last_remove_cell and in_range(pos):
+			_last_remove_cell = cell   # even if empty, so we don't retry every frame
+			game.demolish_at(pos)
+	else:
+		_last_remove_cell = NO_CELL
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -93,9 +109,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		set_active(false)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("demolish"):
-		if in_range(global_position):
-			game.demolish_at(global_position)
-		get_viewport().set_input_as_handled()
+		get_viewport().set_input_as_handled()   # demolishing happens in drag()
 	elif event.is_action_pressed("build_next"):
 		cycle(1)
 		get_viewport().set_input_as_handled()

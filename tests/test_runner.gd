@@ -45,6 +45,9 @@ func reset_player() -> void:
 	p.shoot_cd = 0.0
 	p.shock_cd = 0.0
 	p.reload_timer = 0.0
+	# Most checks below need a gun, so give the test player a pistol.
+	p.inventory.set_count("pistol", 1)
+	p.ranged_weapon = "pistol"
 	p.ammo_in_mag = p.MAG_SIZE
 	p.ammo_reserve = 24
 	p.collision_mask = 1 | 4
@@ -92,6 +95,8 @@ func _run() -> void:
 	# --- world setup
 	p = game.player
 	check(p != null, "player exists")
+	check(p.ranged_weapon == "" and p.melee_weapon == "fists", "you start with only your fists")
+	check(p.inventory.is_empty(), "you start with an empty bag")
 	check(game.ruins.size() > 10, "ruins were generated (%d)" % game.ruins.size())
 	check(get_nodes_in_group("crates").size() >= 30, "crates were placed")
 	check(game.nav != null, "zombie navigation grid is built")
@@ -135,9 +140,6 @@ func _run() -> void:
 	await frames(10)
 	check(not is_instance_valid(z) or z.health < hp0, "bullet hits the zombie")
 	await clear_zombies()
-
-	# --- starting equipment
-	check(p.ranged_weapon == "pistol" and p.melee_weapon == "fists", "you start with a pistol and fists")
 
 	# --- melee kill (with a club)
 	reset_player()
@@ -499,7 +501,7 @@ func _run() -> void:
 	p.use_mouse_aim = true
 	joy_axis(JOY_AXIS_RIGHT_X, 0.0)
 	joy_axis(JOY_AXIS_RIGHT_Y, -1.0)
-	await frames(3)
+	await frames(6)
 	check(p.using_controller, "touching a stick switches to controller mode")
 	check(p.aim_dir.distance_to(Vector2.UP) < 0.05, "right stick aims")
 	joy_axis(JOY_AXIS_RIGHT_Y, 0.0)
@@ -597,6 +599,55 @@ func _run() -> void:
 	game.demolish_at(cellpos.call(3, 0))
 	await frames(2)
 
+	# Drag to demolish: hold demolish and sweep over a line of walls.
+	for i in 4:
+		game.build_piece("wood_wall", cellpos.call(-2 + i, 3))
+	var line_count := func() -> int:
+		var n := 0
+		for st in get_nodes_in_group("structures"):
+			if st.kind == "wood_wall" and absf(st.global_position.y - cellpos.call(0, 3).y) < 1.0:
+				n += 1
+		return n
+	check(line_count.call() == 4, "built a line of 4 walls to drag-remove")
+	for i in 4:
+		game.build.drag(cellpos.call(-2 + i, 3), false, true)
+		game.build.drag(cellpos.call(-2 + i, 3), false, true)   # same square twice: only once
+	await frames(2)
+	check(line_count.call() == 0, "holding demolish and moving removes the whole line")
+	game.build.drag(cellpos.call(0, 0), false, false)   # let go
+	# Drag to build still works.
+	for i in 3:
+		game.build.drag(cellpos.call(-2 + i, 3), true, false)
+	await frames(1)
+	check(line_count.call() == 3, "holding build and moving still builds a line")
+	game.build.drag(cellpos.call(0, 0), false, false)
+	for i in 3:
+		game.demolish_at(cellpos.call(-2 + i, 3))
+	await frames(2)
+
+	# Concrete floor: walkable, and other pieces sit on top of it.
+	bag2.set_count("concrete", 0)
+	bag2.set_count("stone", 100)
+	var bench3 = game.spawn_structure("workbench", cellpos.call(-2, -1))
+	check(p.craft("concrete") and bag2.count("concrete") == 2, "craft concrete at a workbench (3 stone = 2)")
+	bench3.queue_free()
+	await frames(1)
+	check(game.build_piece("concrete_floor", cellpos.call(2, -3)) and bag2.count("concrete") == 1, "build a concrete floor (1 concrete)")
+	check(nav.is_free(cellpos.call(2, -3)), "zombies can walk on floors")
+	check(not game.build_piece("concrete_floor", cellpos.call(2, -3)), "cannot put two floors in one square")
+	check(game.build_piece("concrete_floor", cellpos.call(0, 0)), "you can lay a floor under yourself")
+	check(game.build_piece("wood_wall", cellpos.call(2, -3)), "a wall can be built on a floor")
+	check(not nav.is_free(cellpos.call(2, -3)), "the wall on the floor still blocks zombies")
+	game.demolish_at(cellpos.call(2, -3))
+	var kinds_left := []
+	for st in get_nodes_in_group("structures"):
+		if st.global_position.distance_to(cellpos.call(2, -3)) < 1.0:
+			kinds_left.append(st.kind)
+	check(kinds_left == ["concrete_floor"], "demolish takes the wall first and leaves the floor")
+	game.demolish_at(cellpos.call(2, -3))
+	game.demolish_at(cellpos.call(0, 0))
+	await frames(2)
+
 	# Door: the player walks through, zombies don't.
 	check(game.build_piece("door", cellpos.call(0, 3)), "build a door")
 	var door = null
@@ -663,7 +714,7 @@ func _run() -> void:
 	# The maze line is still standing in front of the base, like a Maul map.
 	z = game.spawn_zombie(cellpos.call(9, 0), true)
 	var smashed := false
-	for i in 1500:
+	for i in 3000:   # the map is random, so some walks to the base are long
 		await physics_frame
 		for wall in ring:
 			if not is_instance_valid(wall) or wall.hp < wall.max_hp:
@@ -756,6 +807,99 @@ func _run() -> void:
 	game.game_over = false
 	game.lose_reason = ""
 	await clear_zombies()
+
+	# --- loot rates
+	var CrateScript = load("res://scripts/loot_crate.gd")
+	var totals := {}
+	for i in 2000:
+		var lc = CrateScript.new()
+		lc.setup(game.rng, i % 2 == 0)
+		for id in lc.loot:
+			totals[id] = totals.get(id, 0) + lc.loot[id]
+		lc.free()
+	check(totals.get("medkit", 0) == 0, "medkits are never found as loot")
+	check(totals.get("bandage", 0) > 0, "bandages can be found as loot")
+	check(totals.get("ammo", 0) / 2000.0 < 2.5, "ammo is rarer (%.1f per crate)" % (totals.get("ammo", 0) / 2000.0))
+	check(totals.get("arrow", 0) / 2000.0 < 0.4, "arrows are rarer (%.2f per crate)" % (totals.get("arrow", 0) / 2000.0))
+	check(game.ZOMBIE_DROP_CHANCE <= 0.1, "zombies drop bags less often")
+
+	# --- backpack upgrades
+	reset_player()
+	p.inventory.max_slots = 16
+	p.inventory.set_count("cloth", 30)
+	p.inventory.set_count("wood", 5)
+	p.inventory.set_count("scrap", 5)
+	check(not p.can_craft("backpack_large"), "large backpack needs the medium one first")
+	check(p.craft("backpack_medium") and p.inventory.max_slots == 20, "medium backpack gives 20 slots")
+	check(p.inventory.count("backpack_medium") == 0, "the backpack is worn, not kept in the bag")
+	check(not p.can_craft("backpack_medium"), "cannot craft the medium backpack twice")
+	var bench2 = game.spawn_structure("workbench", p.position + Vector2(48, 0))
+	check(p.craft("backpack_large") and p.inventory.max_slots == 24, "large backpack gives 24 slots")
+	bench2.queue_free()
+	p.inventory.max_slots = 16
+	for id in ["cloth", "wood", "scrap"]:
+		p.inventory.set_count(id, 0)
+	await frames(1)
+
+	# --- discard
+	reset_player()
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	await frames(1)
+	p.inventory.set_count("club", 1)
+	p.equip("club")
+	p.inventory.set_count("stone", 7)
+	check(p.discard("stone") and p.inventory.count("stone") == 0, "discard throws away a stack")
+	check(p.discard("club") and p.melee_weapon == "fists", "discarding your equipped weapon unequips it")
+	check(not p.discard("stone"), "cannot discard what you do not have")
+	await frames(2)
+	var bags := 0
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 40:
+			bags += 1
+	check(bags >= 1, "dropped items land in a bag at your feet")
+	check(p.interact() and p.inventory.count("stone") + p.inventory.count("club") > 0, "you can pick dropped items back up")
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	p.inventory.set_count("stone", 0)
+	p.inventory.set_count("club", 0)
+	p.inventory.set_count("wood", 4)
+	game.ui.open()
+	game.ui._on_discard_toggle()
+	game.ui._on_player_item("wood")
+	check(game.ui.discard_mode and p.inventory.count("wood") == 0, "discard mode in the character screen drops the item")
+	game.ui.close()
+	game.ui.open()
+	check(not game.ui.discard_mode, "discard mode turns off when the screen reopens")
+	game.ui.close()
+	for c in get_nodes_in_group("crates"):
+		if c.global_position.distance_to(p.position) < 150:
+			c.queue_free()
+	await frames(1)
+
+	# --- campfire pointer (arrow at the screen edge)
+	var Hud = load("res://scripts/hud.gd")
+	var scr := Vector2(1280, 720)
+	check(not Hud.campfire_pointer(Vector2(640, 360), scr, 40.0)["show"], "no campfire arrow when the fire is on screen")
+	var right = Hud.campfire_pointer(Vector2(3000, 360), scr, 40.0)
+	check(right["show"] and is_equal_approx(right["pos"].x, 1240.0) and is_equal_approx(right["pos"].y, 360.0), "fire far right: arrow on the right edge")
+	check(absf(right["angle"]) < 0.01, "and it points right")
+	var up_left = Hud.campfire_pointer(Vector2(-2000, -2000), scr, 40.0)
+	var inside_screen: bool = Rect2(Vector2(39, 39), scr - Vector2(78, 78)).has_point(up_left["pos"])
+	check(up_left["show"] and inside_screen, "fire up-left: arrow stays inside the screen")
+	var fire2 = game.campfire()
+	if fire2 == null:
+		fire2 = game.spawn_structure("campfire", game.WORLD_SIZE / 2)
+	var fire_home: Vector2 = fire2.global_position
+	fire2.global_position = p.global_position + Vector2(1500, 0)
+	game.hud.queue_redraw()
+	await frames(3)
+	var seen: Vector2 = game.hud.get_viewport().get_canvas_transform() * fire2.global_position
+	check(Hud.campfire_pointer(seen, game.hud.size, 40.0)["show"], "an off-screen campfire in the game gets an arrow")
+	fire2.global_position = fire_home
+	await frames(1)
 
 	# --- death
 	reset_player()
