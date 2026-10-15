@@ -4,3 +4,7 @@ build/
 
 # Planning notes stay out of the repo (the roadmap lives in the claude.ai project)
 roadmap.md
+
+# Not part of the game: kept locally only
+tests/
+README.md
