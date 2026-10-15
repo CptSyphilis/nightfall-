@@ -12,6 +12,7 @@ const DATA := {
 	"scrap":     {"name": "Scrap metal", "stack": 30,  "color": Color(0.8, 0.5, 0.35)},
 	"cloth":     {"name": "Cloth",       "stack": 30,  "color": Color(0.85, 0.82, 0.7)},
 	"arrow":     {"name": "Arrows",      "stack": 50,  "color": Color(0.85, 0.75, 0.55)},
+	"concrete":  {"name": "Concrete",    "stack": 50,  "color": Color(0.78, 0.78, 0.76)},
 	"workbench": {"name": "Workbench",   "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
 	"chest":     {"name": "Chest",       "stack": 5,   "color": Color(0.6, 0.85, 0.6), "placeable": true},
 	# Backpack upgrades are used up right away: they give you more inventory slots.
@@ -30,7 +31,7 @@ const DATA := {
 
 ## The order items are listed in the inventory.
 const ORDER := ["pistol", "bow", "crossbow", "club", "stone_axe", "spear", "spiked_club", "machete",
-	"ammo", "arrow", "food", "bandage", "medkit", "wood", "stone", "scrap", "cloth", "workbench", "chest"]
+	"ammo", "arrow", "food", "bandage", "medkit", "wood", "stone", "scrap", "cloth", "concrete", "workbench", "chest"]
 
 ## Weapon stats.
 ## Melee:  damage, range (pixels), arc (radians each side, small = narrow thrust),
@@ -68,6 +69,7 @@ const RECIPES := [
 	{"id": "crossbow",    "amount": 1, "cost": {"wood": 10, "scrap": 4, "cloth": 2}, "bench": true},
 	{"id": "ammo",        "amount": 6, "cost": {"scrap": 2, "stone": 1},            "bench": true},
 	{"id": "medkit",      "amount": 1, "cost": {"cloth": 3, "scrap": 2},            "bench": true},
+	{"id": "concrete",    "amount": 2, "cost": {"stone": 3},                        "bench": true},
 ]
 
 

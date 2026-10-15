@@ -66,6 +66,8 @@ lines up with it. Pieces are paid from your inventory:
   Door          4 wood, 1 scrap            you walk through, zombies don't
   Spike trap    3 wood, 1 stone            hurts and slows zombies walking over it
   Arrow tower   10 wood, 6 stone, 3 scrap  shoots zombies by itself
+  Concrete floor 1 concrete               walkable; build walls and chests on top
+                                           (craft concrete at a workbench: 3 stone = 2)
 Zombies always take the open route, so a long maze buys time for your towers.
 If there is no route at all (you walled yourself in), they walk up to your
 walls and smash through.

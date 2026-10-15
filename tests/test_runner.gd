@@ -625,6 +625,29 @@ func _run() -> void:
 		game.demolish_at(cellpos.call(-2 + i, 3))
 	await frames(2)
 
+	# Concrete floor: walkable, and other pieces sit on top of it.
+	bag2.set_count("concrete", 0)
+	bag2.set_count("stone", 100)
+	var bench3 = game.spawn_structure("workbench", cellpos.call(-2, -1))
+	check(p.craft("concrete") and bag2.count("concrete") == 2, "craft concrete at a workbench (3 stone = 2)")
+	bench3.queue_free()
+	await frames(1)
+	check(game.build_piece("concrete_floor", cellpos.call(2, -3)) and bag2.count("concrete") == 1, "build a concrete floor (1 concrete)")
+	check(nav.is_free(cellpos.call(2, -3)), "zombies can walk on floors")
+	check(not game.build_piece("concrete_floor", cellpos.call(2, -3)), "cannot put two floors in one square")
+	check(game.build_piece("concrete_floor", cellpos.call(0, 0)), "you can lay a floor under yourself")
+	check(game.build_piece("wood_wall", cellpos.call(2, -3)), "a wall can be built on a floor")
+	check(not nav.is_free(cellpos.call(2, -3)), "the wall on the floor still blocks zombies")
+	game.demolish_at(cellpos.call(2, -3))
+	var kinds_left := []
+	for st in get_nodes_in_group("structures"):
+		if st.global_position.distance_to(cellpos.call(2, -3)) < 1.0:
+			kinds_left.append(st.kind)
+	check(kinds_left == ["concrete_floor"], "demolish takes the wall first and leaves the floor")
+	game.demolish_at(cellpos.call(2, -3))
+	game.demolish_at(cellpos.call(0, 0))
+	await frames(2)
+
 	# Door: the player walks through, zombies don't.
 	check(game.build_piece("door", cellpos.call(0, 3)), "build a door")
 	var door = null

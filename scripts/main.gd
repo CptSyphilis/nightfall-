@@ -239,6 +239,8 @@ func spawn_structure(kind: String, pos: Vector2) -> StaticBody2D:
 	s.position = pos
 	s.setup(kind)
 	items_node.add_child(s)
+	if s.is_floor():
+		items_node.move_child(s, 0)   # floors are drawn under everything else
 	if nav != null:
 		nav.add_structure(s)   # zombies need to walk around it
 	return s
@@ -301,7 +303,7 @@ func can_place(kind: String, pos: Vector2) -> bool:
 		if r.grow(4).intersects(rect):
 			return false
 	for s in get_tree().get_nodes_in_group("structures"):
-		if s.rect().grow(4).intersects(rect):
+		if not s.is_floor() and s.rect().grow(4).intersects(rect):
 			return false
 	for n in get_tree().get_nodes_in_group("resources"):
 		if rect.grow(n.radius + 2).has_point(n.global_position):
@@ -336,15 +338,19 @@ func can_build(kind: String, pos: Vector2) -> bool:
 	if not Rect2(Vector2(32, 32), WORLD_SIZE - Vector2(64, 64)).encloses(rect):
 		return false
 	var inside := rect.grow(-1.0)
+	var laying_floor := Buildings.is_floor(kind)
 	for r in ruins:
 		if r.intersects(inside):
 			return false
 	for s in get_tree().get_nodes_in_group("structures"):
-		if s.rect().intersects(inside):
+		# Floors only clash with other floors; everything else sits on top of them.
+		if s.is_floor() == laying_floor and s.rect().intersects(inside):
 			return false
 	for n in get_tree().get_nodes_in_group("resources"):
 		if rect.grow(n.radius - 2.0).has_point(n.global_position):
 			return false
+	if laying_floor:
+		return true   # you can lay a floor right under yourself
 	for body in [player] + get_tree().get_nodes_in_group("zombies"):
 		if rect.grow(body.radius - 2.0).has_point(body.global_position):
 			return false
@@ -371,7 +377,10 @@ func build_piece(kind: String, pos: Vector2) -> bool:
 ## Removes what you built at this spot. Build pieces give half their cost back,
 ## chests and workbenches go back into your inventory. Campfires stay.
 func demolish_at(pos: Vector2) -> bool:
-	for s in get_tree().get_nodes_in_group("structures"):
+	# Things standing on a floor go first, then the floor itself.
+	var list: Array = get_tree().get_nodes_in_group("structures")
+	list.sort_custom(func(a, b): return not a.is_floor() and b.is_floor())
+	for s in list:
 		if not s.rect().grow(2.0).has_point(pos):
 			continue
 		if s.kind == "campfire":
